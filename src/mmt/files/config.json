@@ -11,6 +11,7 @@
 	"mass appo"		: 	false,
 	"data type"		:	"Babs",
 	"additional"		:	["Levoglucosan"],
+	"wavelength error"	:	5.0,
 
 	"SECTION 3"             :       "OPTICAL APPORTIONMENT",
 	"DEFAULT_SCALE"		:	1000,

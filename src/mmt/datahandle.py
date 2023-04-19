@@ -129,27 +129,25 @@ def data_read(configuration_file):
     try:
         input_file = configuration_file['input file']
         # For additional measurements on data, e.g. levoglucosan
-        additional_measurements = split(configuration_file['additional'], ',')
+        additional_measurements = configuration_file['additional']
+        type_of_data = configuration_file['type_of_data']
         rawdata = pd.read_csv(input_file)
     except KeyError as e:
         print(e)
         print(INPUT_FILE_KEY_NOT_PRESENT)
-    # Read the names, the wavelengths and the absorbance (or babs) values
+    # Read the names
     try:
         names = [x for x in rawdata['Name']]
-        wavelengths = [float(x) for x in rawdata['Wavelength']]
-        if 'Babs' in rawdata.keys():
-            b_abs = [float(x) for x in rawdata['Babs']]
-            type_of_data = 'Babs'
-        elif 'ABS' in rawdata.keys():
-            ABS = [float(x) for x in rawdata['ABS']]
-            type_of_data = 'ABS'
-        else:
-            print(INPUT_FILE_NO_ABS)
     except NameError as e:
         print(e)
-    # Check if babs uncertainty is provided and read it
-    uncertainty_provided = True if 'Uncertainty' in rawdata.keys() else False
+    # Read the wavelength directly from the input file header
+    wlength, u_wlength = [], []
+    for k in rawdata.keys():
+        try:
+            wlength.append(int(k))
+            u_wlength.append(configuration_file['wavelength error'])
+        except ValueError:
+            pass
     # Check if a mass apportionment is required
     mass_appo_requested = True if 'EC' in rawdata.keys() and 'OC' in rawdata.keys() else False
     try:
@@ -160,44 +158,10 @@ def data_read(configuration_file):
             mass_appo = False
     except KeyError as ke:
         print(ke)
-    # Make the names unique instead of repeated
-    names = np.unique(np.array(names)).tolist()
     # Create the list of sample objects. This will be the output
     data = [Sample(name) for name in names]
     # Fill the Sample.property 
     for name in names:
-        # Scan for wavelengths and ABS or Babs
-        # Temporary lists to populate from file
-        tmp_wlength, tmp_u_wlength, tmp_abs, tmp_u_abs, tmp_ec, tmp_oc = [], [], [], [], [], [] 
-        for n, w, a in zip(rawdata['Name'], rawdata['Wavelength'], rawdata[type_of_data]):
-            if n == name:
-                # Read the data for the sample in question
-                tmp_wlength.append(float(w))
-                tmp_u_wlength.append(5.0)
-                tmp_abs.append(float(a))
-                if not uncertainty:
-                    tmp_u_abs.append(DEFAULT_ABS_UNCERTAINTY * float(a))
-        if uncertainty:
-            for n, ua in zip(rawdata['Name'], rawdata['Uncertainty']):
-                if n == name:
-                    tmp_u_abs.append(float(ua))
-        if mass_appo:
-            for n, ec, oc in zip(rawdata['Name'], rawdata['EC'], rawdata['OC']):
-                if n == name:
-                    tmp_ec.append(float(ec))
-                    tmp_oc.append(float(oc))
-        for sample in data:
-            if sample.name == name:
-                # Populate the sample properties
-                sample.properties.type_of_data = type_of_data #whether its ABS or b_abs
-                sample.properties.wavelength = tmp_wlength
-                sample.properties.u_wavelength = tmp_u_wlength
-                sample.properties.abs = tmp_abs
-                sample.properties.u_abs = tmp_u_abs
-                if mass_appo:
-                    tmp_ec = tmp_ec[0] # It's all the same values
-                    tmp_oc = tmp_oc[0]
-                    sample.properties.ec = tmp_ec
-                    sample.properties.oc = tmp_oc
+        ##### DA FINIRE DI IMPLEMENTARE
     return data
 
