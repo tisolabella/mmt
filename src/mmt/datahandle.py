@@ -157,7 +157,7 @@ def data_read(configuration_file):
             print(MASS_APPO_NO_EC_OC)
         if not config['mass appo'] and mass_appo_requested:
             print(MASS_APPO_NO_FLAG)
-            mass_appo = False
+            mass_appo_requested = False
     except KeyError as ke:
         print(ke)
     # Create the list of sample objects. This will be the output
@@ -174,5 +174,16 @@ def data_read(configuration_file):
                 if NAME == sample.name:
                     sample.properties.abs.append(ABS)
                     sample.properties.u_abs.append(DEFAULT_ABS_UNCERTAINTY * ABS)
+        if mass_appo_requested:
+            # Fill with carbon concentrations if needed
+            for NAME, EC, OC in zip(rawdata['Name'], rawdata['EC'], rawdata['OC']):
+                if NAME == sample.name:
+                    sample.properties.ec = EC
+                    sample.properties.oc = OC
+        if len(additional_measurements) > 0:
+            for ad_meas_name in additional_measurements:
+                for NAME, AD_MEAS in zip(rawdata['Name'], rawdata[ad_meas_name]):
+                    if NAME == sample.name:
+                        setattr(sample.properties, ad_meas_name, AD_MEAS)
     return data
 
