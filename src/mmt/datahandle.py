@@ -12,7 +12,7 @@ from pprint import pprint
 ###########################################################
 # NUMEERICAL CONSTANTS
 ###########################################################
-DEFAULT_ABS_UNCERTAINTY = .5
+DEFAULT_ABS_UNCERTAINTY = .05
 
 
 
@@ -49,7 +49,7 @@ class Property():
         """The properties are:
 
         # Input data
-        type_of_data (string, either "ABS" or "Babs")
+        data_type (string, either "ABS" or "Babs")
         wavelength (list, nm)
         u_wavelength (list, nm, corresponding to wavelength)
         abs (list, corresponding to wavelength)
@@ -126,11 +126,13 @@ def data_read(configuration_file):
             sample for analysis.
     """
     # Open the input data file
+    with open(configuration_file, 'r') as f:
+        config = json.load(f)
     try:
-        input_file = configuration_file['input file']
+        input_file = config['input file']
         # For additional measurements on data, e.g. levoglucosan
-        additional_measurements = configuration_file['additional']
-        type_of_data = configuration_file['type_of_data']
+        additional_measurements = config['additional']
+        data_type = config['data type']
         rawdata = pd.read_csv(input_file)
     except KeyError as e:
         print(e)
@@ -145,15 +147,15 @@ def data_read(configuration_file):
     for k in rawdata.keys():
         try:
             wlength.append(int(k))
-            u_wlength.append(configuration_file['wavelength error'])
+            u_wlength.append(config['wavelength error'])
         except ValueError:
             pass
     # Check if a mass apportionment is required
     mass_appo_requested = True if 'EC' in rawdata.keys() and 'OC' in rawdata.keys() else False
     try:
-        if configuration_file['mass_appo'] and not mass_appo_requested:
+        if config['mass appo'] and not mass_appo_requested:
             print(MASS_APPO_NO_EC_OC)
-        if not configuration_file['mass_appo'] and mass_appo_requested:
+        if not config['mass appo'] and mass_appo_requested:
             print(MASS_APPO_NO_FLAG)
             mass_appo = False
     except KeyError as ke:
@@ -161,7 +163,16 @@ def data_read(configuration_file):
     # Create the list of sample objects. This will be the output
     data = [Sample(name) for name in names]
     # Fill the Sample.property 
-    for name in names:
-        ##### DA FINIRE DI IMPLEMENTARE
+    for sample in data:
+        sample.properties.wavelength = [x for x in wlength]
+        sample.properties.u_wavelength = [x for x in u_wlength]
+        sample.properties.abs, sample.properties.u_abs = [], []
+        sample.properties.data_type = data_type
+        for wl in wlength:
+            # Fill with the absorption values
+            for NAME, ABS in zip(rawdata['Name'], rawdata[str(wl)]):
+                if NAME == sample.name:
+                    sample.properties.abs.append(ABS)
+                    sample.properties.u_abs.append(DEFAULT_ABS_UNCERTAINTY * ABS)
     return data
 

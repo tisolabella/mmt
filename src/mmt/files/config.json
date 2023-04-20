@@ -1,6 +1,6 @@
 {
 	"SECTION 1"             :       "PATHS",
-	"input file"		:	"../babs_propata.csv",
+	"input file"		:	"../../examples/datain.csv",
 	"fit output"		:	"./results/fitres.csv",
 	"apportionment output"	:	"./results/appres.csv",
 	"mass appo output"	:	"./results/mappres.csv",
