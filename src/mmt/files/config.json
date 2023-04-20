@@ -8,7 +8,7 @@
 	
 	"SECTION 2"             :       "ANALYSIS SETTINGS",
 	"fit_plots"		: 	true,
-	"mass appo"		: 	false,
+	"mass appo"		: 	true,
 	"data type"		:	"Babs",
 	"additional"		:	["Levoglucosan"],
 	"wavelength error"	:	5.0,
