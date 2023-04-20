@@ -28,3 +28,4 @@ def doublefit(x, scale_1, alpha_1, scale_2, alpha_2):
 
 
 
+
