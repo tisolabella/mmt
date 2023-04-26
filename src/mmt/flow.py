@@ -22,7 +22,7 @@ from mathfunk import singlefit, doublefit, set_resolution
 #####################################################################
 # PRINTOUT STRINGS
 #####################################################################
-
+MISSING_KEYWORD = 'ERROR: keyword not present in the configuration file'
 
 
 #####################################################################
@@ -35,7 +35,7 @@ print("\n---> Opening configuration file...\n")
 try:
     configuration_file_path = sys.argv[1]
     with open(configuration_file_path, 'r') as f:
-        config = json.load(f)
+        cfg = json.load(f)
 except Exception as e:
     print(e)
 
@@ -49,24 +49,21 @@ data = data_read(configuration_file_path)
 #####################################################################
 
 
-# Check for booked presets:
-if len(config['presets']) > 0:
-    print("\n---> Preliminary fitting: searching the parameter space...")
-    levo_booked = True if 'levoglucosan' in config['presets'] else False
+#----------- Check for booked presets:
+try:
+    levo_booked = True if 'levoglucosan' in cfg['presets'] else False
+except NameError as e:
+    print(MISSING_KEYWORD, e)
     # Fill in with other presets
 ##### TODO implement user-defined fits and correlations (for the GUI)
 
-# Carry out the LEVOGLUCOSAN CORRELATION ADJUSTMENT
+alpha_BC, alpha_FF, alpha_WB = cfg['alpha BC'], cfg['alpha FF'], cfg['alpha WB']
+best_alpha_BC, best_alpha_FF, best_alpha_WB = alpha_BC, alpha_FF, alpha_WB
+
+#----------- Carry out the LEVOGLUCOSAN CORRELATION ADJUSTMENT
 if levo_booked:
     # Set two parameters
-    alpha_FF, alpha_WB = 1.0, 2.0
-    best_alpha_BC, best_alpha_FF, best_alpha_WB = 1.0, 1.0, 2.0
-    # List for saving correlations TODO remove - unnecessary since the lists
-    # are created with mathfunk.set_resolution()
-    alpha_BC_set = config['alpha BC values']
-    alpha_FF_set = config['alpha FF values']
-    alpha_WB_set = config['alpha WB values']
-    for iteration_number in range(config['iterations']):
+    for iteration_number in range(cfg['iterations']):
         print(f"Iteration number {iteration_number + 1}")
         # Set the search resolution
         alpha_BC_set, alpha_FF_set, alpha_WB_set = set_resolution(best_alpha_BC, 
@@ -213,7 +210,111 @@ if levo_booked:
         #print("best alpha WB", best_alpha_WB, " for R2 ", R_2_alpha_WB[max_R2_index])
         #plt.plot(alpha_WB_set, R_2_alpha_WB)
         #plt.show()
+
+    #--- From now on, use alpha_XX for the best values
+    #--- or the default values if no optimizatios was done
     alpha_BC, alpha_FF, alpha_WB = best_alpha_BC, best_alpha_FF, best_alpha_WB
     print(f"\nThe best parameters for the the correlation with levoglucosan are "
             f"(alpha_BC = {round(alpha_BC, 2)}, alpha_FF = {round(alpha_FF, 2)}, alpha_WB = {round(alpha_WB, 2)}).")
+
+
+##################################################################
+# FITTING PROCEDURE WITH OPTIMIZED PARAMETERS
+##################################################################
+
+for sample in data:
+
+    #--------- AAE fit
+    prp = sample.properties
+    aae_fitres = curve_fit(singlefit, prp.wavelength,
+            prp.abs, p0=(1e5, 1), bounds=([1,0.5], [1e15, 3]),
+            sigma=prp.u_abs)
+    # Save the exponent
+    prp.aae = aae_fitres[0][1]
+    prp.u_aae = np.sqrt(aae_fitres[1][1][1])
+    #--------- Second AAE fit fixing the exp for lower uncertainty
+    def singlefit_fix(x, scale):
+        return singlefit(x, scale, prp.aae)
+    second_aae_fitres = curve_fit(singlefit_fix, prp.wavelength,
+            prp.abs, p0=(1e5), bounds=(1, 1e15),
+            sigma=prp.u_abs)
+    # Save the scale
+    prp.scale = second_aae_fitres[0][0]
+    prp.u_scale = np.sqrt(second_aae_fitres[1][0][0])
+
+    #--------- Components fit
+    def typefit(x, A, B, alpha_BrC):
+        """Fix alpha BC to the best value"""
+        return doublefit(x, A, alpha_BC, B, alpha_BrC)
+    type_fitres = curve_fit(typefit, prp.wavelength,
+            prp.abs, p0=(1e3, 1e10, 3),
+            bounds=([1, 1, 1], [1e15, 1e15, 10]),
+            sigma=prp.u_abs)
+    # Save alpha_BrC
+    prp.alpha_brc = type_fitres[0][2]
+    prp.u_alpha_brc = np.sqrt(type_fitres[1][2][2])
+    #------ Improved components fit
+    def typefit_fix(x, A, B):
+        """Fix alpha BrC for uncertainty improvement"""
+        return typefit(x, A, B, prp.alpha_brc)
+    second_type_fitres = curve_fit(typefit_fix, prp.wavelength,
+            prp.abs, p0=(1e3, 1e10),
+            bounds=([1, 1], [1e15, 1e15]),
+            sigma=prp.u_abs)
+    prp.A = type_fitres[0][0]
+    prp.u_A = np.sqrt(type_fitres[1][0][0])
+    prp.B = type_fitres[0][1]
+    prp.u_B = np.sqrt(type_fitres[1][1][1])
+
+    #---- Source fit
+    def sourcefit(x, A_p, B_p):
+        """Fix alpha_FF and alpha_WB to the best values"""
+        return doublefit(x, A_p, alpha_FF, B_p, alpha_WB)
+    source_fitres = curve_fit(sourcefit, prp.wavelength,
+            prp.abs, p0=(1e3, 1e10),
+            bounds=([1, 1], [1e15, 1e15]),
+            sigma=prp.u_abs)
+    prp.A_p = source_fitres[0][0]
+    prp.u_A_p = np.sqrt(source_fitres[1][0][0])
+    prp.B_p = source_fitres[0][1]
+    prp.u_B_p = np.sqrt(source_fitres[1][1][1])
+
+    #++++ TODO add chisquare for all fits 
+
+    #---- Save plots for the two fits if booked
+    if cfg['fit plots']:
+        # Data points
+        plt.errorbar(prp.wavelength, prp.abs, 
+              xerr=prp.u_wavelength, yerr=prp.u_abs,
+              fmt='.k', elinewidth=0.8, markersize=1.2,
+              label=f'data {sample.name}')
+        x = np.linspace(prp.wavelength[0], prp.wavelength[-1], 500)
+        # Type fit
+        ytype = typefit_fix(x, prp.A, prp.B)
+        plt.plot(x, ytype, 'r', 
+              label='Component fit (BC + BrC)')
+        ybc = singlefit(x, prp.A, alpha_BC)
+        plt.plot(x, ybc, 'k', linewidth=0.5,
+              label='BC contribution')
+        ybrc = singlefit(x, prp.B, prp.alpha_brc)
+        plt.plot(x, ybrc, 'y', linewidth=0.5,
+                label='BrC contribution')
+        # Source fit
+        ysource = sourcefit(x, prp.A_p, prp.B_p)
+        plt.plot(x, ysource, 'b', linestyle='dashed', 
+              label='Source fit (FF + WB)')
+        yff = singlefit(x, prp.A_p, alpha_FF)
+        plt.plot(x, yff, 'm', linewidth=0.5, linestyle='dashed',
+              label='FF contribution')
+        ywb = singlefit(x, prp.B_p, alpha_WB)
+        plt.plot(x, ywb, 'g', linewidth=0.5, linestyle='dashed',
+                label='WB contribution')
+        plt.xlabel('Wavelength [nm]')
+        plt.ylabel(r'$b_{abs}$' + '[Mm'+ r'$^{-1}$' + ']') if prp.data_type == 'Babs' else plt.ylabel('100 ABS')
+        plt.grid()
+        plt.legend()
+        plt.savefig(cfg['working directory'] + f'plots/{sample.name}.png', dpi = 300)
+        plt.close()
+             
+
 

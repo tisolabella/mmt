@@ -39,7 +39,7 @@ class Sample():
         # Name string
         ns = f'Sample object - Name {self.name}'
         # Properties string
-        ps =str(list(self.properties.__dict__.keys()))
+        ps = str(list(self.properties.__dict__.keys()))
         string_to_print = ns + '\nProperties - ' + ps +'\n'
         return string_to_print
 
