@@ -15,7 +15,7 @@
 
 	"SECTION 3"		:	"PRE-FIT",
 	"presets"		:	["levoglucosan"],
-	"iterations"		:	2,
+	"iterations"		:	5,
 	"resolution"		:	5,	
 	"alpha BC values"	:	[0.8, 0.9, 1.0, 1.1, 1.2],
 	"alpha FF values"	:	[0.8, 0.9, 1.0, 1.1, 1.2],
