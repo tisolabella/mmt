@@ -4,12 +4,14 @@
 
 import json, sys, inspect
 import numpy as np
+from csv import writer
 import matplotlib.pyplot as plt
 from scipy.stats import linregress
 from scipy.optimize import curve_fit
 
 from datahandle import data_read
-from mathfunk import singlefit, doublefit, set_resolution
+from mathfunk import singlefit, doublefit
+from mathfunk import set_resolution, get_chisq
 
 
 #####################################################################
@@ -62,9 +64,11 @@ best_alpha_BC, best_alpha_FF, best_alpha_WB = alpha_BC, alpha_FF, alpha_WB
 
 #----------- Carry out the LEVOGLUCOSAN CORRELATION ADJUSTMENT
 if levo_booked:
+    print(f'---> Performing correlation maximisation with'
+            ' "levoglucosan" preset...\n')
     # Set two parameters
     for iteration_number in range(cfg['iterations']):
-        print(f"Iteration number {iteration_number + 1}")
+        print(f"\t*Iteration {iteration_number + 1}")
         # Set the search resolution
         alpha_BC_set, alpha_FF_set, alpha_WB_set = set_resolution(best_alpha_BC, 
                 best_alpha_FF, best_alpha_WB, iteration=iteration_number)
@@ -215,12 +219,18 @@ if levo_booked:
     #--- or the default values if no optimizatios was done
     alpha_BC, alpha_FF, alpha_WB = best_alpha_BC, best_alpha_FF, best_alpha_WB
     print(f"\nThe best parameters for the the correlation with levoglucosan are "
-            f"(alpha_BC = {round(alpha_BC, 2)}, alpha_FF = {round(alpha_FF, 2)}, alpha_WB = {round(alpha_WB, 2)}).")
+            f"(alpha_BC = {round(alpha_BC, 2)}, alpha_FF = {round(alpha_FF, 2)}, alpha_WB = {round(alpha_WB, 2)}).\n")
+
+    # TODO produce nice plots for this procedure
+
+
 
 
 ##################################################################
 # FITTING PROCEDURE WITH OPTIMIZED PARAMETERS
 ##################################################################
+
+print(f'---> Fitting the experimental data...\n')
 
 for sample in data:
 
@@ -241,6 +251,11 @@ for sample in data:
     # Save the scale
     prp.scale = second_aae_fitres[0][0]
     prp.u_scale = np.sqrt(second_aae_fitres[1][0][0])
+    # Calculates the chisquared for this fit
+    expected = [singlefit_fix(x, prp.scale) for x in prp.wavelength]
+    ndf = len(prp.wavelength) - 2
+    tmp, prp.red_chisq_aae_fit = get_chisq(prp.abs, expected,
+            prp.u_abs, ndf)
 
     #--------- Components fit
     def typefit(x, A, B, alpha_BrC):
@@ -265,6 +280,11 @@ for sample in data:
     prp.u_A = np.sqrt(type_fitres[1][0][0])
     prp.B = type_fitres[0][1]
     prp.u_B = np.sqrt(type_fitres[1][1][1])
+    # Calculates the chisquared for this fit
+    expected = [typefit_fix(x, prp.A, prp.B) for x in prp.wavelength]
+    ndf = len(prp.wavelength) - 3
+    tmp, prp.red_chisq_type_fit = get_chisq(prp.abs, expected,
+            prp.u_abs, ndf)
 
     #---- Source fit
     def sourcefit(x, A_p, B_p):
@@ -278,11 +298,56 @@ for sample in data:
     prp.u_A_p = np.sqrt(source_fitres[1][0][0])
     prp.B_p = source_fitres[0][1]
     prp.u_B_p = np.sqrt(source_fitres[1][1][1])
+    # Calculates the chisquared for this fit
+    expected = [sourcefit(x, prp.A_p, prp.B_p) for x in prp.wavelength]
+    ndf = len(prp.wavelength) - 2
+    tmp, prp.red_chisq_source_fit = get_chisq(prp.abs, expected,
+            prp.u_abs, ndf)
 
-    #++++ TODO add chisquare for all fits 
+             
 
-    #---- Save plots for the two fits if booked
-    if cfg['fit plots']:
+#####################################################################
+# FIT PARAMETERS WRITEOUT
+#####################################################################
+
+try:
+    print(f"---> Writing fit results to {cfg['fit output']}\n")
+    out_path = cfg['fit output']
+    with open(out_path, 'w') as f:
+        writa = writer(f)
+        header = ['Name', 'Scale', 'eScale', 'AAE', 
+                'eAAE', 'Red_chisq', 'A', 'eA', 'B', 
+                'eB', 'alpha_BrC', 'ealpha_BrC', 'Red_chisq', 
+                'A\'', 'eA\'', 'B\'', 'eB\'', 'Red_chisq']
+        writa.writerow(header)
+        for sample in data:
+            prp = sample.properties
+            linetowrite = [sample.name, prp.scale, prp.u_scale, 
+                    prp.aae, prp.u_aae, prp.red_chisq_aae_fit, 
+                    prp.A, prp.u_A, prp.B, prp.u_B, prp.alpha_brc,
+                    prp.u_alpha_brc, prp.red_chisq_type_fit, 
+                    prp.A_p, prp.u_A_p, prp.B_p, prp.u_B_p, 
+                    prp.red_chisq_source_fit]
+            writa.writerow(linetowrite) 
+except KeyError as ke:
+    print(MISSING_KEYWORD, ke)
+
+
+# TODO at the end of everything write a .log file with
+# all the analysis parameter
+
+
+
+
+#####################################################################
+# SAVE PLOTS
+#####################################################################
+
+#---- Save fit plots plots for the two fits if booked
+if cfg['fit plots']:
+    print(f'---> Saving fit plots in {cfg["working directory"]}' + f'plots/fitplots/') 
+    for sample in data:
+        prp = sample.properties
         # Data points
         plt.errorbar(prp.wavelength, prp.abs, 
               xerr=prp.u_wavelength, yerr=prp.u_abs,
@@ -310,11 +375,9 @@ for sample in data:
         plt.plot(x, ywb, 'g', linewidth=0.5, linestyle='dashed',
                 label='WB contribution')
         plt.xlabel('Wavelength [nm]')
-        plt.ylabel(r'$b_{abs}$' + '[Mm'+ r'$^{-1}$' + ']') if prp.data_type == 'Babs' else plt.ylabel('100 ABS')
+        plt.ylabel(r'Absorption coefficient, $b_{abs}$  ' + '[Mm'+ r'$^{-1}$' + ']') if prp.data_type == 'Babs' else plt.ylabel('100 ABS')
         plt.grid()
         plt.legend()
-        plt.savefig(cfg['working directory'] + f'plots/{sample.name}.png', dpi = 300)
+        plt.tight_layout()
+        plt.savefig(cfg['working directory'] + f'plots/fitplots/{sample.name}.png', dpi = 300)
         plt.close()
-             
-
-

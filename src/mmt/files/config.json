@@ -14,8 +14,8 @@
 	"wavelength error"	:	5.0,
 
 	"SECTION 3"		:	"PRE-FIT",
-	"presets"		:	[],
-	"iterations"		:	5,
+	"presets"		:	["levoglucosan"],
+	"iterations"		:	3,
 	"resolution"		:	5,	
 	"alpha BC"		:	1.0,
 	"alpha FF"		:	1.0,

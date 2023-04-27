@@ -38,7 +38,16 @@ def set_resolution(*best_parameters, iteration=2):
                 best_param + 2 * resolution]
         return_list.append(param_list)
     return return_list
-        
+
+def get_chisq(data, expected, sigma, ndf):
+    """Calculates the chi squared"""
+    chi = 0
+    for d, e, s in zip(data, expected, sigma):
+        chi += (((d - e) ** 2) / (s ** 2))
+    # Returns the chisquared and the reduced chisq
+    return chi, (chi / ndf)
+
+
 
 
 
