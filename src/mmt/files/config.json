@@ -2,7 +2,7 @@
 	"SECTION 1"             :       "PATHS",
 	"input file"		:	"../../examples/datain_prop.csv",
 	"fit output"		:	"../../examples/results/fitres.csv",
-	"apportionment output"	:	"../../examples/results/appres.csv",
+	"opt appo output"	:	"../../examples/results/appres.csv",
 	"mass appo output"	:	"../../examples/results/mappres.csv",
 	"working directory"	:	"../../examples/results/",
 	

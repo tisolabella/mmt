@@ -24,7 +24,8 @@ from mathfunk import set_resolution, get_chisq
 #####################################################################
 # PRINTOUT STRINGS
 #####################################################################
-MISSING_KEYWORD = 'ERROR: keyword not present in the configuration file'
+MISSING_KEYWORD = "ERROR: keyword not present in the"
+"configuration file\n"
 
 
 #####################################################################
@@ -333,12 +334,87 @@ except KeyError as ke:
     print(MISSING_KEYWORD, ke)
 
 
+
+
+
+
+#####################################################################
+# OPTICAL APPORTIONMENT
+#####################################################################
+
+for sample in data:
+    prp = sample.properties
+    A = prp.A
+    B = prp.B
+    A_p = prp.A_p
+    B_p = prp.B_p
+    alpha_BrC = prp.alpha_brc
+    prp.bc_wb, prp.bc_wb_frac = [], []
+    prp.bc_ff, prp.bc_ff_frac = [], []
+    prp.brc, prp.brc_frac = [], []
+    for w, a in zip(prp.wavelength, prp.abs):
+        #--- BC wood burning
+        value = (A - A_p) / (w ** alpha_BC)
+        prp.bc_wb.append(value)
+        prp.bc_wb_frac.append(value / a)
+        #--- BC fossil fuel
+        value = A_p / (w ** alpha_FF)
+        prp.bc_ff.append(value)
+        prp.bc_ff_frac.append(value / a)
+        #--- BrC 
+        value = B / (w ** alpha_BrC)
+        prp.brc.append(value)
+        prp.brc_frac.append(value / a)
+
+
+
+#####################################################################
+# OPTICAL APPORTIONMENT RESULTS WRITEOUT
+#####################################################################
+
+# Use the first sample to write header
+header_1 = ['',]
+for w in data[0].properties.wavelength:
+    header_1.append(f'{w} nm')
+    header_1.append('')
+    header_1.append('')
+header_1 = header_1 + header_1[1:]
+header_2 = ['Name',]
+for i in range(len(data[0].properties.wavelength)):
+    header_2 += ['BC_FF_frac', 'BC_WB_frac', 'BrC_frac']
+for i in range(len(data[0].properties.wavelength)):
+    header_2 += ['BC_FF', 'BC_WB', 'BrC']
+
+try:
+    print(f"---> Writing optical apportionment"
+            f" results to {cfg['fit output']}\n")
+    out_path = cfg['opt appo output']
+    with open(out_path, 'w') as f:
+        writa = writer(f)
+        writa.writerow(header_1)
+        writa.writerow(header_2)
+        for sample in data:
+            prp = sample.properties
+            line_to_write = [sample.name,]
+            zippo = zip(prp.bc_ff_frac, prp.bc_wb_frac, prp.brc_frac)
+            for bcff_frac, bcwb_frac, brc_frac in zippo:
+                line_to_write.append(bcff_frac)
+                line_to_write.append(bcwb_frac)
+                line_to_write.append(brc_frac)
+            zippo = zip(prp.bc_ff, prp.bc_wb, prp.brc)
+            for bcff, bcwb, brc in zippo:
+                line_to_write.append(bcff)
+                line_to_write.append(bcwb)
+                line_to_write.append(brc)
+            writa.writerow(line_to_write)
+except KeyError as ke:
+    print(MISSING_KEYWORD, ke)
+
+
+
+
 # TODO at the end of everything write a .log file with
 # all the analysis parameter
-
-
-
-
 #####################################################################
 # SAVE PLOTS
 #####################################################################
