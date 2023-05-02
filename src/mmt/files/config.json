@@ -8,6 +8,8 @@
 	
 	"SECTION 2"             :       "ANALYSIS SETTINGS",
 	"fit plots"		: 	true,
+	"pre plots"		: 	true,
+	"appo plots"		: 	true,
 	"mass appo"		: 	false,
 	"data type"		:	"Babs",
 	"additional"		:	["Levoglucosan"],

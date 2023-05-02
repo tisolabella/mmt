@@ -1,0 +1,22 @@
+---------- GENERAL
+Start date:	2/5/2023, 12:54:32
+End date:	2/5/2023, 12:54:57
+Input file:	../../examples/datain_prop.csv
+Output folder:	../../examples/results/
+
+---------- PREPROCESSING
+Booked presets:	['levoglucosan']
+Best parameters: 
+	alpha_BC = 0.9333333333333333 
+	alpha_FF = 0.9333333333333333 
+	alpha_WB = 1.8
+
+---------- FIT
+N° failed fits:	0
+Failed fits:	[]
+Average alpha_BrC:	 3.49491
+Std dev on alpha_BrC:	 0.11195
+Fit plots in:	../../examples/results/plots/fitplots/
+
+---------- OPTICAL APPORTIONMENT
+Optical apportionment plots in:	../../examples/results/plots/appoplots/

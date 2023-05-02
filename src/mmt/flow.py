@@ -2,7 +2,7 @@
 # IMPORTS
 #####################################################################
 
-import json, sys, inspect
+import json, sys, inspect, datetime, warnings
 import numpy as np
 from csv import writer
 import matplotlib.pyplot as plt
@@ -10,8 +10,15 @@ from scipy.stats import linregress
 from scipy.optimize import curve_fit
 
 from datahandle import data_read
-from mathfunk import singlefit, doublefit
-from mathfunk import set_resolution, get_chisq
+from funk import singlefit, doublefit
+from funk import set_resolution, get_chisq
+from funk import average, stddev
+
+#------ Get the starting date and time
+start_time = datetime.datetime.now()
+
+warnings.filterwarnings("ignore")
+
 
 
 #####################################################################
@@ -24,8 +31,11 @@ from mathfunk import set_resolution, get_chisq
 #####################################################################
 # PRINTOUT STRINGS
 #####################################################################
-MISSING_KEYWORD = "ERROR: keyword not present in the"
-"configuration file\n"
+MISSING_KEYWORD = "ERROR: keyword not present in the configuration file"
+MISSING_FOLDER = "ERROR: the folder is not present, some files cannot be saved"
+
+
+
 
 
 #####################################################################
@@ -47,6 +57,8 @@ data = data_read(configuration_file_path)
 
 
 
+
+
 #####################################################################
 # PRELIMINARY FITTING AND CORRELATIONS
 #####################################################################
@@ -57,7 +69,7 @@ try:
     levo_booked = True if 'levoglucosan' in cfg['presets'] else False
 except NameError as e:
     print(MISSING_KEYWORD, e)
-    # Fill in with other presets
+# Fill in with other presets
 ##### TODO implement user-defined fits and correlations (for the GUI)
 
 alpha_BC, alpha_FF, alpha_WB = cfg['alpha BC'], cfg['alpha FF'], cfg['alpha WB']
@@ -110,11 +122,6 @@ if levo_booked:
                 R_2_alpha_BC.append(0)
         max_R2_index = R_2_alpha_BC.index(max(R_2_alpha_BC))
         best_alpha_BC = alpha_BC_set[max_R2_index]
-        # For checking
-        #print(alpha_BC_set, R_2_alpha_BC)
-        #print("best alpha BC", best_alpha_BC, " for R2 ", R_2_alpha_BC[max_R2_index])
-        #plt.plot(alpha_BC_set, R_2_alpha_BC)
-        #plt.show()
 
         #------ Do the alpha_FF iteration -------------
         # List for the correlations
@@ -160,11 +167,6 @@ if levo_booked:
                 R_2_alpha_FF.append(0)
         max_R2_index = R_2_alpha_FF.index(max(R_2_alpha_FF))
         best_alpha_FF = alpha_FF_set[max_R2_index]
-        # For checking
-        #print(alpha_FF_set, R_2_alpha_FF)
-        #print("best alpha FF", best_alpha_FF, " for R2 ", R_2_alpha_FF[max_R2_index])
-        #plt.plot(alpha_FF_set, R_2_alpha_FF)
-        #plt.show()
 
         #------ Do the alpha_WB iteration -------------
         # List for the correlations
@@ -210,11 +212,33 @@ if levo_booked:
                 R_2_alpha_WB.append(0)
         max_R2_index = R_2_alpha_WB.index(max(R_2_alpha_WB))
         best_alpha_WB = alpha_WB_set[max_R2_index]
-        # For checking
-        #print(alpha_WB_set, R_2_alpha_WB)
-        #print("best alpha WB", best_alpha_WB, " for R2 ", R_2_alpha_WB[max_R2_index])
-        #plt.plot(alpha_WB_set, R_2_alpha_WB)
-        #plt.show()
+
+        #--- Save plots for the correlation vs parameter values
+        try:
+            if cfg['pre plots']:
+                print('\t\tsaving plots')
+                fig, ax = plt.subplots()
+                ax.plot(best_alpha_BC, max(R_2_alpha_BC), 'rx', label='best')
+                ax.plot(alpha_BC_set, R_2_alpha_BC, 'k-', label=r'$\alpha_{BC}$')
+                ax.plot(alpha_FF_set, R_2_alpha_FF, 'r-', label=r'$\alpha_{FF}$')
+                ax.plot(best_alpha_FF, max(R_2_alpha_FF), 'rx')
+                ax2 = ax.twiny()
+                ax2.plot(alpha_WB_set, R_2_alpha_WB, 'b-', label=r'$\alpha_{WB}$')
+                ax2.plot(best_alpha_WB, max(R_2_alpha_WB), 'rx')
+                ax.grid()
+                ax.set_xlabel(r'Parameter value for $\alpha_{BC}$ and $\alpha_{FF}$')
+                ax2.set_xlabel(r'Parameter value for $\alpha_{WB}$')
+                ax.set_ylabel(r'Levoglucosan analysis $R^2$')
+                fig.legend(bbox_to_anchor=(0.15, 0.15, 0.15, 0.25))
+                plt.tight_layout()
+                try:
+                    plt.savefig(cfg['working directory'] + f'plots/preplots/iter{iteration_number + 1}.png', dpi = 300)
+                except FileNotFoundError as fnfe:
+                    # TODO if the folder does not exist, create it
+                    print(MISSING_FOLDER, fnfe)
+                plt.close()
+        except KeyError as ke:
+            print(MISSING_KEYWORD, ke)
 
     #--- From now on, use alpha_XX for the best values
     #--- or the default values if no optimizatios was done
@@ -222,7 +246,7 @@ if levo_booked:
     print(f"\nThe best parameters for the the correlation with levoglucosan are "
             f"(alpha_BC = {round(alpha_BC, 2)}, alpha_FF = {round(alpha_FF, 2)}, alpha_WB = {round(alpha_WB, 2)}).\n")
 
-    # TODO produce nice plots for this procedure
+
 
 
 
@@ -233,79 +257,99 @@ if levo_booked:
 
 print(f'---> Fitting the experimental data...\n')
 
+failed_fit_count = 0
+failed_fit = []
+
 for sample in data:
 
     #--------- AAE fit
     prp = sample.properties
-    aae_fitres = curve_fit(singlefit, prp.wavelength,
-            prp.abs, p0=(1e5, 1), bounds=([1,0.5], [1e15, 3]),
-            sigma=prp.u_abs)
-    # Save the exponent
-    prp.aae = aae_fitres[0][1]
-    prp.u_aae = np.sqrt(aae_fitres[1][1][1])
-    #--------- Second AAE fit fixing the exp for lower uncertainty
-    def singlefit_fix(x, scale):
-        return singlefit(x, scale, prp.aae)
-    second_aae_fitres = curve_fit(singlefit_fix, prp.wavelength,
-            prp.abs, p0=(1e5), bounds=(1, 1e15),
-            sigma=prp.u_abs)
-    # Save the scale
-    prp.scale = second_aae_fitres[0][0]
-    prp.u_scale = np.sqrt(second_aae_fitres[1][0][0])
-    # Calculates the chisquared for this fit
-    expected = [singlefit_fix(x, prp.scale) for x in prp.wavelength]
-    ndf = len(prp.wavelength) - 2
-    tmp, prp.red_chisq_aae_fit = get_chisq(prp.abs, expected,
-            prp.u_abs, ndf)
+    try:
+        aae_fitres = curve_fit(singlefit, prp.wavelength,
+                prp.abs, p0=(1e5, 1), bounds=([1,0.5], [1e15, 3]),
+                sigma=prp.u_abs)
+        # Save the exponent
+        prp.aae = aae_fitres[0][1]
+        prp.u_aae = np.sqrt(aae_fitres[1][1][1])
+        #--------- Second AAE fit fixing the exp for lower uncertainty
+        def singlefit_fix(x, scale):
+            return singlefit(x, scale, prp.aae)
+        second_aae_fitres = curve_fit(singlefit_fix, prp.wavelength,
+                prp.abs, p0=(1e5), bounds=(1, 1e15),
+                sigma=prp.u_abs)
+        # Save the scale
+        prp.scale = second_aae_fitres[0][0]
+        prp.u_scale = np.sqrt(second_aae_fitres[1][0][0])
+        # Calculates the chisquared for this fit
+        expected = [singlefit_fix(x, prp.scale) for x in prp.wavelength]
+        ndf = len(prp.wavelength) - 2
+        tmp, prp.red_chisq_aae_fit = get_chisq(prp.abs, expected,
+                prp.u_abs, ndf)
+    except RuntimeError as re:
+        print(FIT_ERROR, re)
+        failed_fit_count += 1
+        failed_fit.append(['aae', f'sample {sample.name}'])
 
     #--------- Components fit
     def typefit(x, A, B, alpha_BrC):
         """Fix alpha BC to the best value"""
         return doublefit(x, A, alpha_BC, B, alpha_BrC)
-    type_fitres = curve_fit(typefit, prp.wavelength,
-            prp.abs, p0=(1e3, 1e10, 3),
-            bounds=([1, 1, 1], [1e15, 1e15, 10]),
-            sigma=prp.u_abs)
-    # Save alpha_BrC
-    prp.alpha_brc = type_fitres[0][2]
-    prp.u_alpha_brc = np.sqrt(type_fitres[1][2][2])
-    #------ Improved components fit
-    def typefit_fix(x, A, B):
-        """Fix alpha BrC for uncertainty improvement"""
-        return typefit(x, A, B, prp.alpha_brc)
-    second_type_fitres = curve_fit(typefit_fix, prp.wavelength,
-            prp.abs, p0=(1e3, 1e10),
-            bounds=([1, 1], [1e15, 1e15]),
-            sigma=prp.u_abs)
-    prp.A = type_fitres[0][0]
-    prp.u_A = np.sqrt(type_fitres[1][0][0])
-    prp.B = type_fitres[0][1]
-    prp.u_B = np.sqrt(type_fitres[1][1][1])
-    # Calculates the chisquared for this fit
-    expected = [typefit_fix(x, prp.A, prp.B) for x in prp.wavelength]
-    ndf = len(prp.wavelength) - 3
-    tmp, prp.red_chisq_type_fit = get_chisq(prp.abs, expected,
-            prp.u_abs, ndf)
+    try:
+        type_fitres = curve_fit(typefit, prp.wavelength,
+                prp.abs, p0=(1e3, 1e10, 3),
+                bounds=([1, 1, 1], [1e15, 1e15, 10]),
+                sigma=prp.u_abs)
+        # Save alpha_BrC
+        prp.alpha_brc = type_fitres[0][2]
+        prp.u_alpha_brc = np.sqrt(type_fitres[1][2][2])
+        #------ Improved components fit
+        def typefit_fix(x, A, B):
+            """Fix alpha BrC for uncertainty improvement"""
+            return typefit(x, A, B, prp.alpha_brc)
+        second_type_fitres = curve_fit(typefit_fix, prp.wavelength,
+                prp.abs, p0=(1e3, 1e10),
+                bounds=([1, 1], [1e15, 1e15]),
+                sigma=prp.u_abs)
+        prp.A = type_fitres[0][0]
+        prp.u_A = np.sqrt(type_fitres[1][0][0])
+        prp.B = type_fitres[0][1]
+        prp.u_B = np.sqrt(type_fitres[1][1][1])
+        # Calculates the chisquared for this fit
+        expected = [typefit_fix(x, prp.A, prp.B) for x in prp.wavelength]
+        ndf = len(prp.wavelength) - 3
+        tmp, prp.red_chisq_type_fit = get_chisq(prp.abs, expected,
+                prp.u_abs, ndf)
+    except RuntimeError as re:
+        print(FIT_ERROR, re)
+        failed_fit_count += 1
+        failed_fit.append(['type', f'sample {sample.name}'])
 
     #---- Source fit
     def sourcefit(x, A_p, B_p):
         """Fix alpha_FF and alpha_WB to the best values"""
         return doublefit(x, A_p, alpha_FF, B_p, alpha_WB)
-    source_fitres = curve_fit(sourcefit, prp.wavelength,
-            prp.abs, p0=(1e3, 1e10),
-            bounds=([1, 1], [1e15, 1e15]),
-            sigma=prp.u_abs)
-    prp.A_p = source_fitres[0][0]
-    prp.u_A_p = np.sqrt(source_fitres[1][0][0])
-    prp.B_p = source_fitres[0][1]
-    prp.u_B_p = np.sqrt(source_fitres[1][1][1])
-    # Calculates the chisquared for this fit
-    expected = [sourcefit(x, prp.A_p, prp.B_p) for x in prp.wavelength]
-    ndf = len(prp.wavelength) - 2
-    tmp, prp.red_chisq_source_fit = get_chisq(prp.abs, expected,
-            prp.u_abs, ndf)
+    try:
+        source_fitres = curve_fit(sourcefit, prp.wavelength,
+                prp.abs, p0=(1e3, 1e10),
+                bounds=([1, 1], [1e15, 1e15]),
+                sigma=prp.u_abs)
+        prp.A_p = source_fitres[0][0]
+        prp.u_A_p = np.sqrt(source_fitres[1][0][0])
+        prp.B_p = source_fitres[0][1]
+        prp.u_B_p = np.sqrt(source_fitres[1][1][1])
+        # Calculates the chisquared for this fit
+        expected = [sourcefit(x, prp.A_p, prp.B_p) for x in prp.wavelength]
+        ndf = len(prp.wavelength) - 2
+        tmp, prp.red_chisq_source_fit = get_chisq(prp.abs, expected,
+                prp.u_abs, ndf)
+    except RuntimeError as re:
+        print(FIT_ERROR, re)
+        failed_fit_count += 1
+        failed_fit.append(['source', f'sample {sample.name}'])
 
              
+
+
 
 #####################################################################
 # FIT PARAMETERS WRITEOUT
@@ -368,6 +412,7 @@ for sample in data:
 
 
 
+
 #####################################################################
 # OPTICAL APPORTIONMENT RESULTS WRITEOUT
 #####################################################################
@@ -420,40 +465,143 @@ except KeyError as ke:
 #####################################################################
 
 #---- Save fit plots plots for the two fits if booked
-if cfg['fit plots']:
-    print(f'---> Saving fit plots in {cfg["working directory"]}' + f'plots/fitplots/') 
-    for sample in data:
-        prp = sample.properties
-        # Data points
-        plt.errorbar(prp.wavelength, prp.abs, 
-              xerr=prp.u_wavelength, yerr=prp.u_abs,
-              fmt='.k', elinewidth=0.8, markersize=1.2,
-              label=f'data {sample.name}')
-        x = np.linspace(prp.wavelength[0], prp.wavelength[-1], 500)
-        # Type fit
-        ytype = typefit_fix(x, prp.A, prp.B)
-        plt.plot(x, ytype, 'r', 
-              label='Component fit (BC + BrC)')
-        ybc = singlefit(x, prp.A, alpha_BC)
-        plt.plot(x, ybc, 'k', linewidth=0.5,
-              label='BC contribution')
-        ybrc = singlefit(x, prp.B, prp.alpha_brc)
-        plt.plot(x, ybrc, 'y', linewidth=0.5,
-                label='BrC contribution')
-        # Source fit
-        ysource = sourcefit(x, prp.A_p, prp.B_p)
-        plt.plot(x, ysource, 'b', linestyle='dashed', 
-              label='Source fit (FF + WB)')
-        yff = singlefit(x, prp.A_p, alpha_FF)
-        plt.plot(x, yff, 'm', linewidth=0.5, linestyle='dashed',
-              label='FF contribution')
-        ywb = singlefit(x, prp.B_p, alpha_WB)
-        plt.plot(x, ywb, 'g', linewidth=0.5, linestyle='dashed',
-                label='WB contribution')
-        plt.xlabel('Wavelength [nm]')
-        plt.ylabel(r'Absorption coefficient, $b_{abs}$  ' + '[Mm'+ r'$^{-1}$' + ']') if prp.data_type == 'Babs' else plt.ylabel('100 ABS')
-        plt.grid()
-        plt.legend()
-        plt.tight_layout()
-        plt.savefig(cfg['working directory'] + f'plots/fitplots/{sample.name}.png', dpi = 300)
-        plt.close()
+try:
+    if cfg['fit plots']:
+        print(f'---> Saving fit plots in {cfg["working directory"]}' + f'plots/fitplots/' + '\n') 
+        for sample in data:
+            prp = sample.properties
+            # Data points
+            plt.errorbar(prp.wavelength, prp.abs, 
+                  xerr=prp.u_wavelength, yerr=prp.u_abs,
+                  fmt='.k', elinewidth=0.8, markersize=1.2,
+                  label=f'data {sample.name}')
+            x = np.linspace(prp.wavelength[0], prp.wavelength[-1], 500)
+            # Type fit
+            ytype = typefit_fix(x, prp.A, prp.B)
+            plt.plot(x, ytype, 'r', 
+                  label='Component fit (BC + BrC)')
+            ybc = singlefit(x, prp.A, alpha_BC)
+            plt.plot(x, ybc, 'k', linewidth=0.5,
+                  label='BC contribution')
+            ybrc = singlefit(x, prp.B, prp.alpha_brc)
+            plt.plot(x, ybrc, 'y', linewidth=0.5,
+                    label='BrC contribution')
+            # Source fit
+            ysource = sourcefit(x, prp.A_p, prp.B_p)
+            plt.plot(x, ysource, 'b', linestyle='dashed', 
+                  label='Source fit (FF + WB)')
+            yff = singlefit(x, prp.A_p, alpha_FF)
+            plt.plot(x, yff, 'm', linewidth=0.5, linestyle='dashed',
+                  label='FF contribution')
+            ywb = singlefit(x, prp.B_p, alpha_WB)
+            plt.plot(x, ywb, 'g', linewidth=0.5, linestyle='dashed',
+                    label='WB contribution')
+            plt.xlabel('Wavelength [nm]')
+            plt.ylabel(r'Absorption coefficient, $b_{abs}$  ' + '[Mm'+ r'$^{-1}$' + ']') if prp.data_type == 'Babs' else plt.ylabel('100 ABS')
+            plt.grid()
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig(cfg['working directory'] + f'plots/fitplots/{sample.name}.png', dpi = 300)
+            plt.close()
+except KeyError as ke:
+    print(MISSING_KEYWORD, ke)
+
+
+#----- Save plots for the optical apportionment if booked
+try:
+    if cfg['appo plots']:
+        print(f'---> Saving optical apportionment plots in {cfg["working directory"]}' + f'plots/fitplots/' + '\n') 
+        # Lists to store values for plotting
+        bc_ff_short, bc_wb_short, brc_short, names = [], [], [], []
+        bc_ff_long, bc_wb_long, brc_long = [], [], []
+        # Shortest and longest wavelength indices
+        # (in case the lambda are not in ascending order)
+        lambda_short = min(data[0].properties.wavelength)
+        i_short = data[0].properties.wavelength.index(lambda_short)
+        lambda_long = max(data[0].properties.wavelength)
+        i_long = data[0].properties.wavelength.index(lambda_long)
+        for sample in data:
+            prp = sample.properties
+            brc_short.append(prp.brc[i_short])
+            bc_wb_short.append(prp.bc_wb[i_short])
+            bc_ff_short.append(prp.bc_ff[i_short])
+            bc_ff_long.append(prp.bc_ff[i_long])
+            bc_wb_long.append(prp.bc_wb[i_long])
+            brc_long.append(prp.brc[i_long])
+            names.append(sample.name)
+        fig1, ax1 = plt.subplots() # For short lambda
+        fig2, ax2 = plt.subplots() # For long lambda
+        ax1.plot(names, bc_ff_short, '-k', label=r'BC$_{FF}$'+ f'@ {lambda_short} nm')
+        ax1.plot(names, bc_wb_short, '-y', label=r'BC$_{WB}$'+ f'@ {lambda_short} nm')
+        ax1.plot(names, brc_short, '-r', label=r'BrC'+ f'@ {lambda_short} nm')
+        ax1.set_xticklabels(names, rotation=75)
+        ax1.grid()
+        ax1.set_ylabel(r'Absorption coefficient, $b_{abs}$  ' + '[Mm'+ r'$^{-1}$' + ']') if prp.data_type == 'Babs' else plt.ylabel('100 ABS')
+        ax1.legend()
+        ax2.plot(names, bc_ff_long, '-k', label=r'BC$_{FF}$'+ f'@ {lambda_long} nm')
+        ax2.plot(names, bc_wb_long, '-y', label=r'BC$_{WB}$'+ f'@ {lambda_long} nm')
+        ax2.plot(names, brc_long, '-r', label=r'BrC'+ f'@ {lambda_long} nm')
+        ax2.set_xticklabels(names, rotation=75)
+        ax2.grid()
+        ax2.set_ylabel(r'Absorption coefficient, $b_{abs}$  ' + '[Mm'+ r'$^{-1}$' + ']') if prp.data_type == 'Babs' else plt.ylabel('100 ABS')
+        ax2.legend()
+        try:
+            fig1.savefig(cfg['working directory'] + f'plots/appoplots/short_lambda.png', dpi = 300)
+            fig2.savefig(cfg['working directory'] + f'plots/appoplots/long_lambda.png', dpi = 300)
+        except FileNotFoundError as fnfe:
+            # TODO if the folder does not exist, create it
+            print(MISSING_FOLDER, fnfe)
+except KeyError as ke:
+    print(MISSING_KEYWORD, ke)
+
+
+
+#####################################################################
+# WRITE LOG FILE
+#####################################################################
+
+#----- Get the time of the analysis end
+end_time = datetime.datetime.now()
+
+#----- Prepare the lines to write
+date_start_line = f'Start date:\t{start_time.day}/{start_time.month}/{start_time.year}, {start_time.hour}:{start_time.minute}:{start_time.second}\n'
+date_end_line = f'End date:\t{end_time.day}/{end_time.month}/{end_time.year}, {end_time.hour}:{end_time.minute}:{end_time.second}\n'
+input_file_line = 'Input file:\t' + cfg['input file'] + '\n'
+output_folder_line = 'Output folder:\t' + cfg['working directory'] + '\n'
+presets_line = 'Booked presets:\t' + str(cfg['presets']) + '\n'
+best_par_line = f'Best parameters: \n\talpha_BC = {best_alpha_BC} \n\talpha_FF = {best_alpha_FF} \n\talpha_WB = {best_alpha_WB}\n'
+failed_fit_count_line = f'N° failed fits:\t{failed_fit_count}\n'
+failed_fit_line = f'Failed fits:\t{failed_fit}\n'
+# Get a list to do statistics on alpha brown
+list_for_abrc = [d.properties.alpha_brc for d in data]
+avg_alpha, stddev_alpha = average(list_for_abrc), stddev(list_for_abrc)
+alpha_mean_line = f"Average alpha_BrC:\t {round(avg_alpha, 5)}\n"
+alpha_stddev_line = f"Std dev on alpha_BrC:\t {round(stddev_alpha, 5)}\n"
+saved_fit_plots_line = f"Fit plots in:\t{cfg['working directory']}plots/fitplots/\n" if cfg['fit plots'] else f"Fit plots not saved\n"
+saved_appo_plots_line = f"Optical apportionment plots in:\t{cfg['working directory']}plots/appoplots/\n" if cfg['appo plots'] else f"Optical apportionment plots not saved\n"
+try:
+    with open(cfg['working directory'] + 'log.txt', 'w') as f:
+        print(f'---> Writing log file in {cfg["working directory"]}' + '\n') 
+        f.write('---------- GENERAL\n')
+        f.write(date_start_line)
+        f.write(date_end_line)
+        f.write(input_file_line)
+        f.write(output_folder_line)
+        f.write('\n---------- PREPROCESSING\n')
+        f.write(presets_line)
+        f.write(best_par_line)
+        f.write('\n---------- FIT\n')
+        f.write(failed_fit_count_line)
+        f.write(failed_fit_line)
+        f.write(alpha_mean_line)
+        f.write(alpha_stddev_line)
+        f.write(saved_fit_plots_line)
+        f.write('\n---------- OPTICAL APPORTIONMENT\n')
+        f.write(saved_appo_plots_line)
+except KeyError as ke:
+    print(MISSING_KEYWORD, ke)
+
+
+
+
+print('*** DONE ***\n\n')

@@ -48,6 +48,20 @@ def get_chisq(data, expected, sigma, ndf):
     return chi, (chi / ndf)
 
 
+def average(l):
+    """Returns the average value of a list"""
+    s = 0
+    for x in l:
+        s += x
+    return s / len(l)
+
+
+def stddev(l):
+    """Returns the standard deviation of a list"""
+    ll = [x ** 2 for x in l]
+    avg_sq, sq_avg = average(ll), average(l) ** 2
+    return np.sqrt(avg_sq - sq_avg)
+
 
 
 
