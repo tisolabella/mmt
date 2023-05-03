@@ -1,6 +1,6 @@
 ---------- GENERAL
-Start date:	2/5/2023, 12:54:32
-End date:	2/5/2023, 12:54:57
+Start date:	2/5/2023, 16:3:21
+End date:	2/5/2023, 16:3:46
 Input file:	../../examples/datain_prop.csv
 Output folder:	../../examples/results/
 
@@ -10,6 +10,7 @@ Best parameters:
 	alpha_BC = 0.9333333333333333 
 	alpha_FF = 0.9333333333333333 
 	alpha_WB = 1.8
+Parameter optimization plots in:	../../examples/results/plots/preplots/
 
 ---------- FIT
 N° failed fits:	0

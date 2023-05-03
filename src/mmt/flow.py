@@ -88,6 +88,7 @@ if levo_booked:
         #------ Do the alpha_BC iteration -------------
         # List for the correlations
         R_2_alpha_BC = []
+        BC_correlation_pairs = []
         for alpha_BC in alpha_BC_set:
             # List to save the BrC(lambda_short) and levo
             BrC_set, levo_set = [], []
@@ -117,10 +118,13 @@ if levo_booked:
             try:
                 regression_res = linregress(levo_set, y=BrC_set)
                 R_2_alpha_BC.append(regression_res.rvalue ** 2)
+                BC_correlation_pairs.append([alpha_BC, regression_res])
             except Exception as e:
                 print(f'REGRESSION ERROR for ALPHA BC: {e}')
                 R_2_alpha_BC.append(0)
+                BC_correlation_pairs.append([alpha_BC, 0])
         max_R2_index = R_2_alpha_BC.index(max(R_2_alpha_BC))
+        # For stability,  
         best_alpha_BC = alpha_BC_set[max_R2_index]
 
         #------ Do the alpha_FF iteration -------------
@@ -162,9 +166,11 @@ if levo_booked:
             try:
                 regression_res = linregress(levo_set, y=BC_WB_set)
                 R_2_alpha_FF.append(regression_res.rvalue ** 2)
+                FF_correlation_pairs.append([alpha_FF, regression_res])
             except Exception as e:
                 print(f'REGRESSION ERROR for ALPHA FF: {e}')
                 R_2_alpha_FF.append(0)
+                FF_correlation_pairs.append([alpha_FF, regression_res])
         max_R2_index = R_2_alpha_FF.index(max(R_2_alpha_FF))
         best_alpha_FF = alpha_FF_set[max_R2_index]
 
@@ -207,9 +213,11 @@ if levo_booked:
             try:
                 regression_res = linregress(levo_set, y=BC_WB_set)
                 R_2_alpha_WB.append(regression_res.rvalue ** 2)
+                WB_correlation_pairs.append([alpha_WB, regression_res])
             except Exception as e:
                 print(f'REGRESSION ERROR for ALPHA WB: {e}')
                 R_2_alpha_WB.append(0)
+                WB_correlation_pairs.append([alpha_WB, regression_res])
         max_R2_index = R_2_alpha_WB.index(max(R_2_alpha_WB))
         best_alpha_WB = alpha_WB_set[max_R2_index]
 
@@ -506,11 +514,34 @@ try:
 except KeyError as ke:
     print(MISSING_KEYWORD, ke)
 
+#----- Save plots for the variation of alpha_brc if booked
+try:
+    if cfg['alpha plot']:
+        print(f'---> Saving alpha plot in {cfg["working directory"]}' + f'plots/fitplots/' + '\n') 
+        # Lists to store values for plotting
+        alpha, error, names = [], [], []
+        for sample in data:
+            prp = sample.properties
+            alpha.append(prp.alpha_brc)
+            error.append(prp.u_alpha_brc)
+            names.append(sample.name)
+        fig, ax = plt.subplots() 
+        ax.errorbar(names, alpha, xerr=None, yerr=error, fmt='.r')
+        ax.set_xticklabels(names, rotation=75)
+        ax.grid()
+        ax.set_ylabel(r'$\alpha_{BrC}$')
+        try:
+            fig.savefig(cfg['working directory'] + f'plots/fitplots/alpha_BrC.png', dpi = 300)
+        except FileNotFoundError as fnfe:
+            # TODO if the folder does not exist, create it
+            print(MISSING_FOLDER, fnfe)
+except KeyError as ke:
+    print(MISSING_KEYWORD, ke)
 
 #----- Save plots for the optical apportionment if booked
 try:
     if cfg['appo plots']:
-        print(f'---> Saving optical apportionment plots in {cfg["working directory"]}' + f'plots/fitplots/' + '\n') 
+        print(f'---> Saving optical apportionment plots in {cfg["working directory"]}' + f'plots/appoplots/' + '\n') 
         # Lists to store values for plotting
         bc_ff_short, bc_wb_short, brc_short, names = [], [], [], []
         bc_ff_long, bc_wb_long, brc_long = [], [], []
@@ -570,6 +601,7 @@ input_file_line = 'Input file:\t' + cfg['input file'] + '\n'
 output_folder_line = 'Output folder:\t' + cfg['working directory'] + '\n'
 presets_line = 'Booked presets:\t' + str(cfg['presets']) + '\n'
 best_par_line = f'Best parameters: \n\talpha_BC = {best_alpha_BC} \n\talpha_FF = {best_alpha_FF} \n\talpha_WB = {best_alpha_WB}\n'
+saved_par_plots_line = f"Parameter optimization plots in:\t{cfg['working directory']}plots/preplots/\n" if cfg['pre plots'] else f"Parameter optimization plots not saved\n"
 failed_fit_count_line = f'N° failed fits:\t{failed_fit_count}\n'
 failed_fit_line = f'Failed fits:\t{failed_fit}\n'
 # Get a list to do statistics on alpha brown
@@ -590,6 +622,7 @@ try:
         f.write('\n---------- PREPROCESSING\n')
         f.write(presets_line)
         f.write(best_par_line)
+        f.write(saved_par_plots_line)
         f.write('\n---------- FIT\n')
         f.write(failed_fit_count_line)
         f.write(failed_fit_line)

@@ -63,7 +63,6 @@ class Property():
         scale (float)
         u_scale (float)
         chisq_aae_fit (float)
-        red_chisq_aae_fit (float)
         a (float)
         u_a (float)
         b (float)
@@ -71,13 +70,11 @@ class Property():
         alpha_brc (float)
         u_alpha_brc (float)
         chisq_type_fit (float)
-        red_chisq_type_fit (float)
         a_p (float)
         u_a_p (float)
         b_p (float)
         u_b_p (float)
         chisq_source_fit (float)
-        red_chisq_source_fit (float)
 
         # From the optical apportionment
         brc (list, corresponding to wavelength)
