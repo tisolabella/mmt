@@ -12,7 +12,7 @@ from scipy.optimize import curve_fit
 from datahandle import data_read
 from funk import singlefit, doublefit
 from funk import set_resolution, get_chisq
-from funk import average, stddev
+from funk import average, stddev, weighted_average
 
 #------ Get the starting date and time
 start_time = datetime.datetime.now()
@@ -72,6 +72,8 @@ except NameError as e:
 # Fill in with other presets
 ##### TODO implement user-defined fits and correlations (for the GUI)
 
+# The valus in the cfg file are the default to be used if there is
+# no preliminary analysis
 alpha_BC, alpha_FF, alpha_WB = cfg['alpha BC'], cfg['alpha FF'], cfg['alpha WB']
 best_alpha_BC, best_alpha_FF, best_alpha_WB = alpha_BC, alpha_FF, alpha_WB
 
@@ -88,7 +90,7 @@ if levo_booked:
         #------ Do the alpha_BC iteration -------------
         # List for the correlations
         R_2_alpha_BC = []
-        BC_correlation_pairs = []
+        BC_correlation_pairs = {}
         for alpha_BC in alpha_BC_set:
             # List to save the BrC(lambda_short) and levo
             BrC_set, levo_set = [], []
@@ -118,18 +120,23 @@ if levo_booked:
             try:
                 regression_res = linregress(levo_set, y=BrC_set)
                 R_2_alpha_BC.append(regression_res.rvalue ** 2)
-                BC_correlation_pairs.append([alpha_BC, regression_res])
+                BC_correlation_pairs[alpha_BC] = regression_res.rvalue ** 2
             except Exception as e:
                 print(f'REGRESSION ERROR for ALPHA BC: {e}')
                 R_2_alpha_BC.append(0)
-                BC_correlation_pairs.append([alpha_BC, 0])
+                BC_correlation_pairs[alpha_BC] = 0
         max_R2_index = R_2_alpha_BC.index(max(R_2_alpha_BC))
-        # For stability,  
-        best_alpha_BC = alpha_BC_set[max_R2_index]
+        # For stability, use the best only if its significantly
+        # better than the previous best:
+        if R_2_alpha_BC[max_R2_index] - BC_correlation_pairs[best_alpha_BC] < cfg['threshold']:
+            pass # Do not change the value
+        else:
+            best_alpha_BC = alpha_BC_set[max_R2_index]
 
         #------ Do the alpha_FF iteration -------------
         # List for the correlations
         R_2_alpha_FF = []
+        FF_correlation_pairs = {}
         for alpha_FF in alpha_FF_set:
             # List to save the BC_WB(lambda_long) and levo
             BC_WB_set, levo_set = [], []
@@ -166,17 +173,23 @@ if levo_booked:
             try:
                 regression_res = linregress(levo_set, y=BC_WB_set)
                 R_2_alpha_FF.append(regression_res.rvalue ** 2)
-                FF_correlation_pairs.append([alpha_FF, regression_res])
+                FF_correlation_pairs[alpha_FF] = regression_res.rvalue ** 2
             except Exception as e:
                 print(f'REGRESSION ERROR for ALPHA FF: {e}')
                 R_2_alpha_FF.append(0)
-                FF_correlation_pairs.append([alpha_FF, regression_res])
+                FF_correlation_pairs[alpha_FF] = 0
         max_R2_index = R_2_alpha_FF.index(max(R_2_alpha_FF))
-        best_alpha_FF = alpha_FF_set[max_R2_index]
+        # For stability, use the best only if its significantly
+        # better than the previous best:
+        if R_2_alpha_FF[max_R2_index] - FF_correlation_pairs[best_alpha_FF] < cfg['threshold']:
+            pass # Do not change the value
+        else:
+            best_alpha_FF = alpha_FF_set[max_R2_index]
 
         #------ Do the alpha_WB iteration -------------
         # List for the correlations
         R_2_alpha_WB = []
+        WB_correlation_pairs = {}
         for alpha_WB in alpha_WB_set:
             # List to save the BC_WB(lambda_long) and levo
             BC_WB_set, levo_set = [], []
@@ -213,27 +226,32 @@ if levo_booked:
             try:
                 regression_res = linregress(levo_set, y=BC_WB_set)
                 R_2_alpha_WB.append(regression_res.rvalue ** 2)
-                WB_correlation_pairs.append([alpha_WB, regression_res])
+                WB_correlation_pairs[alpha_WB] = regression_res.rvalue ** 2
             except Exception as e:
                 print(f'REGRESSION ERROR for ALPHA WB: {e}')
                 R_2_alpha_WB.append(0)
-                WB_correlation_pairs.append([alpha_WB, regression_res])
+                WB_correlation_pairs[alpha_WB] = 0
         max_R2_index = R_2_alpha_WB.index(max(R_2_alpha_WB))
-        best_alpha_WB = alpha_WB_set[max_R2_index]
+        # For stability, use the best only if its significantly
+        # better than the previous best:
+        if R_2_alpha_WB[max_R2_index] - WB_correlation_pairs[best_alpha_WB] < cfg['threshold']:
+            pass # Do not change the value
+        else:
+            best_alpha_WB = alpha_WB_set[max_R2_index]
 
         #--- Save plots for the correlation vs parameter values
         try:
             if cfg['pre plots']:
                 print('\t\tsaving plots')
                 fig, ax = plt.subplots()
-                ax.plot(best_alpha_BC, max(R_2_alpha_BC), 'rx', label='best')
+                ax.plot(best_alpha_BC, BC_correlation_pairs[best_alpha_BC], 'rx', label='best')
                 ax.plot(alpha_BC_set, R_2_alpha_BC, 'k-', label=r'$\alpha_{BC}$')
+                ax.plot(best_alpha_FF, FF_correlation_pairs[best_alpha_FF], 'rx')
                 ax.plot(alpha_FF_set, R_2_alpha_FF, 'r-', label=r'$\alpha_{FF}$')
-                ax.plot(best_alpha_FF, max(R_2_alpha_FF), 'rx')
                 ax2 = ax.twiny()
+                ax2.plot(best_alpha_WB, WB_correlation_pairs[best_alpha_WB], 'rx')
                 ax2.plot(alpha_WB_set, R_2_alpha_WB, 'b-', label=r'$\alpha_{WB}$')
-                ax2.plot(best_alpha_WB, max(R_2_alpha_WB), 'rx')
-                ax.grid()
+                ax.grid(alpha=0.3)
                 ax.set_xlabel(r'Parameter value for $\alpha_{BC}$ and $\alpha_{FF}$')
                 ax2.set_xlabel(r'Parameter value for $\alpha_{WB}$')
                 ax.set_ylabel(r'Levoglucosan analysis $R^2$')
@@ -255,6 +273,38 @@ if levo_booked:
             f"(alpha_BC = {round(alpha_BC, 2)}, alpha_FF = {round(alpha_FF, 2)}, alpha_WB = {round(alpha_WB, 2)}).\n")
 
 
+
+
+
+
+
+#################################################################
+# ALPHA BrC variation with ALPHA BC
+#################################################################
+
+try:
+    if cfg['alpha bc swipe']:
+        print("---> Performing alpha bc swipe...\n")
+        sw_alpha_BC_set = np.linspace(0.8, 1.2, 20).tolist()
+        sw_alpha_BrC_set = []
+        sw_alpha_BrC_stddev_set = []
+        for abc in sw_alpha_BC_set:
+            tmp_abrc_list = []
+            for sample in data:
+                prp = sample.properties
+                def typefit(x, A, B, alpha_BrC):
+                    """Fix alpha BC to the best value"""
+                    return doublefit(x, A, abc, B, alpha_BrC)
+                type_fitres = curve_fit(typefit, prp.wavelength,
+                        prp.abs, p0=(1e3, 1e10, 3),
+                        bounds=([1, 1, 1], [1e15, 1e15, 10]),
+                        sigma=prp.u_abs)
+                # Save alpha_BrC
+                tmp_abrc_list.append(type_fitres[0][2])
+            sw_alpha_BrC_set.append(average(tmp_abrc_list))
+            sw_alpha_BrC_stddev_set.append(stddev(tmp_abrc_list))
+except KeyError as ke:
+    print(MISSING_KEYWORD, ke)
 
 
 
@@ -466,8 +516,7 @@ except KeyError as ke:
 
 
 
-# TODO at the end of everything write a .log file with
-# all the analysis parameter
+
 #####################################################################
 # SAVE PLOTS
 #####################################################################
@@ -506,7 +555,7 @@ try:
                     label='WB contribution')
             plt.xlabel('Wavelength [nm]')
             plt.ylabel(r'Absorption coefficient, $b_{abs}$  ' + '[Mm'+ r'$^{-1}$' + ']') if prp.data_type == 'Babs' else plt.ylabel('100 ABS')
-            plt.grid()
+            plt.grid(alpha=0.3)
             plt.legend()
             plt.tight_layout()
             plt.savefig(cfg['working directory'] + f'plots/fitplots/{sample.name}.png', dpi = 300)
@@ -528,8 +577,9 @@ try:
         fig, ax = plt.subplots() 
         ax.errorbar(names, alpha, xerr=None, yerr=error, fmt='.r')
         ax.set_xticklabels(names, rotation=75)
-        ax.grid()
+        ax.grid(alpha=0.3)
         ax.set_ylabel(r'$\alpha_{BrC}$')
+        plt.tight_layout()
         try:
             fig.savefig(cfg['working directory'] + f'plots/fitplots/alpha_BrC.png', dpi = 300)
         except FileNotFoundError as fnfe:
@@ -537,6 +587,32 @@ try:
             print(MISSING_FOLDER, fnfe)
 except KeyError as ke:
     print(MISSING_KEYWORD, ke)
+
+
+#----- Save plots for the swipe of alpha_bc if booked
+try:
+    if cfg['swipe plot']:
+        print(f'---> Saving swipe plot in {cfg["working directory"]}' + f'plots/fitplots/' + '\n') 
+        fig, ax = plt.subplots() 
+        y = sw_alpha_BrC_set
+        u_y = sw_alpha_BrC_stddev_set
+        u_up, u_down = [a+b for (a,b) in zip(y, u_y)], [a-b for (a,b) in zip(y, u_y)]
+        ax.plot(sw_alpha_BC_set, y, '-r', label='average')
+        ax.fill_between(sw_alpha_BC_set, u_up, u_down, color='red', 
+                alpha=0.3, label=r'$1\sigma$ band')
+        ax.grid(alpha=0.3)
+        ax.set_ylabel(r'$\alpha_{BrC}$ averaged over all samples')
+        ax.set_xlabel(r'$\alpha_{BC}$')
+        ax.legend()
+        plt.tight_layout()
+        try:
+            fig.savefig(cfg['working directory'] + f'plots/fitplots/swipe.png', dpi = 300)
+        except FileNotFoundError as fnfe:
+            # TODO if the folder does not exist, create it
+            print(MISSING_FOLDER, fnfe)
+except KeyError as ke:
+    print(MISSING_KEYWORD, ke)
+
 
 #----- Save plots for the optical apportionment if booked
 try:
@@ -562,20 +638,28 @@ try:
             names.append(sample.name)
         fig1, ax1 = plt.subplots() # For short lambda
         fig2, ax2 = plt.subplots() # For long lambda
-        ax1.plot(names, bc_ff_short, '-k', label=r'BC$_{FF}$'+ f'@ {lambda_short} nm')
-        ax1.plot(names, bc_wb_short, '-y', label=r'BC$_{WB}$'+ f'@ {lambda_short} nm')
+        ax1.plot(names, bc_ff_short, '-g', label=r'BC$_{FF}$'+ f'@ {lambda_short} nm')
+        ax1.plot(names, bc_ff_short, '.g')
+        ax1.plot(names, bc_wb_short, '-b', label=r'BC$_{WB}$'+ f'@ {lambda_short} nm')
+        ax1.plot(names, bc_wb_short, '.b')
         ax1.plot(names, brc_short, '-r', label=r'BrC'+ f'@ {lambda_short} nm')
+        ax1.plot(names, brc_short, '.r')
         ax1.set_xticklabels(names, rotation=75)
-        ax1.grid()
+        ax1.grid(alpha=0.3)
         ax1.set_ylabel(r'Absorption coefficient, $b_{abs}$  ' + '[Mm'+ r'$^{-1}$' + ']') if prp.data_type == 'Babs' else plt.ylabel('100 ABS')
         ax1.legend()
-        ax2.plot(names, bc_ff_long, '-k', label=r'BC$_{FF}$'+ f'@ {lambda_long} nm')
-        ax2.plot(names, bc_wb_long, '-y', label=r'BC$_{WB}$'+ f'@ {lambda_long} nm')
+        ax2.plot(names, bc_ff_long, '-g', label=r'BC$_{FF}$'+ f'@ {lambda_long} nm')
+        ax2.plot(names, bc_ff_long, '.g')
+        ax2.plot(names, bc_wb_long, '-b', label=r'BC$_{WB}$'+ f'@ {lambda_long} nm')
+        ax2.plot(names, bc_wb_long, '.b')
         ax2.plot(names, brc_long, '-r', label=r'BrC'+ f'@ {lambda_long} nm')
+        ax2.plot(names, brc_long, '.r')
         ax2.set_xticklabels(names, rotation=75)
-        ax2.grid()
+        ax2.grid(alpha=0.3)
         ax2.set_ylabel(r'Absorption coefficient, $b_{abs}$  ' + '[Mm'+ r'$^{-1}$' + ']') if prp.data_type == 'Babs' else plt.ylabel('100 ABS')
         ax2.legend()
+        fig1.tight_layout()
+        fig2.tight_layout()
         try:
             fig1.savefig(cfg['working directory'] + f'plots/appoplots/short_lambda.png', dpi = 300)
             fig2.savefig(cfg['working directory'] + f'plots/appoplots/long_lambda.png', dpi = 300)
@@ -595,8 +679,8 @@ except KeyError as ke:
 end_time = datetime.datetime.now()
 
 #----- Prepare the lines to write
-date_start_line = f'Start date:\t{start_time.day}/{start_time.month}/{start_time.year}, {start_time.hour}:{start_time.minute}:{start_time.second}\n'
-date_end_line = f'End date:\t{end_time.day}/{end_time.month}/{end_time.year}, {end_time.hour}:{end_time.minute}:{end_time.second}\n'
+date_start_line = f'Start time:\t{start_time.day}/{start_time.month}/{start_time.year}, {start_time.hour}:{start_time.minute}:{start_time.second}\n'
+date_end_line = f'End time:\t{end_time.day}/{end_time.month}/{end_time.year}, {end_time.hour}:{end_time.minute}:{end_time.second}\n'
 input_file_line = 'Input file:\t' + cfg['input file'] + '\n'
 output_folder_line = 'Output folder:\t' + cfg['working directory'] + '\n'
 presets_line = 'Booked presets:\t' + str(cfg['presets']) + '\n'
@@ -606,9 +690,10 @@ failed_fit_count_line = f'N° failed fits:\t{failed_fit_count}\n'
 failed_fit_line = f'Failed fits:\t{failed_fit}\n'
 # Get a list to do statistics on alpha brown
 list_for_abrc = [d.properties.alpha_brc for d in data]
-avg_alpha, stddev_alpha = average(list_for_abrc), stddev(list_for_abrc)
-alpha_mean_line = f"Average alpha_BrC:\t {round(avg_alpha, 5)}\n"
-alpha_stddev_line = f"Std dev on alpha_BrC:\t {round(stddev_alpha, 5)}\n"
+list_for_uabrc = [d.properties.u_alpha_brc for d in data]
+avg_alpha, stddev_alpha = average( list_for_abrc), stddev(list_for_abrc)
+alpha_mean_line = f"Weighted average alpha_BrC:\t {round(avg_alpha, 7)}\n"
+alpha_stddev_line = f"Uncertainty on alpha_BrC:\t {round(stddev_alpha, 7)}\n"
 saved_fit_plots_line = f"Fit plots in:\t{cfg['working directory']}plots/fitplots/\n" if cfg['fit plots'] else f"Fit plots not saved\n"
 saved_appo_plots_line = f"Optical apportionment plots in:\t{cfg['working directory']}plots/appoplots/\n" if cfg['appo plots'] else f"Optical apportionment plots not saved\n"
 try:

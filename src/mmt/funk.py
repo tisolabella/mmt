@@ -55,6 +55,14 @@ def average(l):
         s += x
     return s / len(l)
 
+def weighted_average(l, el):
+    """Returns the average of a list weigthed by el"""
+    s = 0
+    ws = 0
+    for x, ex in zip(l, el):
+        s += x / ex ** 2
+        ws += 1 / ex ** 2
+    return s / ws, 1 / np.sqrt(ws)
 
 def stddev(l):
     """Returns the standard deviation of a list"""
