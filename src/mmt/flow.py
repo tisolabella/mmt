@@ -2,7 +2,7 @@
 # IMPORTS
 #####################################################################
 
-import json, sys, inspect, datetime, warnings
+import json, sys, inspect, datetime, warnings, pickle
 import numpy as np
 from csv import writer
 import matplotlib.pyplot as plt
@@ -405,13 +405,50 @@ for sample in data:
         failed_fit_count += 1
         failed_fit.append(['source', f'sample {sample.name}'])
 
+
+
+
+
+
+#####################################################################
+# OPTICAL APPORTIONMENT
+#####################################################################
+
+print("---> Performing optical apportionment...\n")
+for sample in data:
+    prp = sample.properties
+    A = prp.A
+    B = prp.B
+    A_p = prp.A_p
+    B_p = prp.B_p
+    alpha_BrC = prp.alpha_brc
+    prp.bc_wb, prp.bc_wb_frac = [], []
+    prp.bc_ff, prp.bc_ff_frac = [], []
+    prp.brc, prp.brc_frac = [], []
+    for w, a in zip(prp.wavelength, prp.abs):
+        #--- BC wood burning
+        value = (A - A_p) / (w ** alpha_BC)
+        prp.bc_wb.append(value)
+        prp.bc_wb_frac.append(value / a)
+        #--- BC fossil fuel
+        value = A_p / (w ** alpha_FF)
+        prp.bc_ff.append(value)
+        prp.bc_ff_frac.append(value / a)
+        #--- BrC 
+        value = B / (w ** alpha_BrC)
+        prp.brc.append(value)
+        prp.brc_frac.append(value / a)
+
              
 
 
 
-#####################################################################
+
+
+
+###################################################################
 # FIT PARAMETERS WRITEOUT
-#####################################################################
+###################################################################
 
 try:
     print(f"---> Writing fit results to {cfg['fit output']}\n")
@@ -437,36 +474,6 @@ except KeyError as ke:
 
 
 
-
-
-
-#####################################################################
-# OPTICAL APPORTIONMENT
-#####################################################################
-
-for sample in data:
-    prp = sample.properties
-    A = prp.A
-    B = prp.B
-    A_p = prp.A_p
-    B_p = prp.B_p
-    alpha_BrC = prp.alpha_brc
-    prp.bc_wb, prp.bc_wb_frac = [], []
-    prp.bc_ff, prp.bc_ff_frac = [], []
-    prp.brc, prp.brc_frac = [], []
-    for w, a in zip(prp.wavelength, prp.abs):
-        #--- BC wood burning
-        value = (A - A_p) / (w ** alpha_BC)
-        prp.bc_wb.append(value)
-        prp.bc_wb_frac.append(value / a)
-        #--- BC fossil fuel
-        value = A_p / (w ** alpha_FF)
-        prp.bc_ff.append(value)
-        prp.bc_ff_frac.append(value / a)
-        #--- BrC 
-        value = B / (w ** alpha_BrC)
-        prp.brc.append(value)
-        prp.brc_frac.append(value / a)
 
 
 
@@ -591,7 +598,7 @@ except KeyError as ke:
 
 #----- Save plots for the swipe of alpha_bc if booked
 try:
-    if cfg['swipe plot']:
+    if cfg['alpha bc swipe']:
         print(f'---> Saving swipe plot in {cfg["working directory"]}' + f'plots/fitplots/' + '\n') 
         fig, ax = plt.subplots() 
         y = sw_alpha_BrC_set
@@ -606,7 +613,7 @@ try:
         ax.legend()
         plt.tight_layout()
         try:
-            fig.savefig(cfg['working directory'] + f'plots/fitplots/swipe.png', dpi = 300)
+            fig.savefig(cfg['working directory'] + f'plots/fitplots/swipe.png', dpi=300)
         except FileNotFoundError as fnfe:
             # TODO if the folder does not exist, create it
             print(MISSING_FOLDER, fnfe)
@@ -661,8 +668,8 @@ try:
         fig1.tight_layout()
         fig2.tight_layout()
         try:
-            fig1.savefig(cfg['working directory'] + f'plots/appoplots/short_lambda.png', dpi = 300)
-            fig2.savefig(cfg['working directory'] + f'plots/appoplots/long_lambda.png', dpi = 300)
+            fig1.savefig(cfg['working directory'] + f'plots/appoplots/short_lambda.png', dpi=300)
+            fig2.savefig(cfg['working directory'] + f'plots/appoplots/long_lambda.png', dpi=300)
         except FileNotFoundError as fnfe:
             # TODO if the folder does not exist, create it
             print(MISSING_FOLDER, fnfe)
@@ -720,6 +727,13 @@ except KeyError as ke:
     print(MISSING_KEYWORD, ke)
 
 
+
+##################################################################
+# SAVE JSON
+##################################################################
+print(f"---> Saving .pkl data file for internal use in {cfg['working directory']}\n")
+with open(cfg['working directory'] + 'data.pkl', 'wb') as f:
+    pickle.dump(data, f, -1)
 
 
 print('*** DONE ***\n\n')

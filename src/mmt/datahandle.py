@@ -149,14 +149,6 @@ def data_read(configuration_file):
             pass
     # Check if a mass apportionment is required
     mass_appo_requested = True if 'EC' in rawdata.keys() and 'OC' in rawdata.keys() else False
-    try:
-        if config['mass appo'] and not mass_appo_requested:
-            print(MASS_APPO_NO_EC_OC)
-        if not config['mass appo'] and mass_appo_requested:
-            print(MASS_APPO_NO_FLAG)
-            mass_appo_requested = False
-    except KeyError as ke:
-        print(ke)
     # Create the list of sample objects. This will be the output
     data = [Sample(name) for name in names]
     # Fill the Sample.property 

@@ -1,10 +1,10 @@
 {
 	"SECTION 1"             :       "PATHS",
-	"input file"		:	"../../examples/datain_prop.csv",
-	"fit output"		:	"../../examples/results/fitres.csv",
-	"opt appo output"	:	"../../examples/results/appres.csv",
-	"mass appo output"	:	"../../examples/results/mappres.csv",
-	"working directory"	:	"../../examples/results/",
+	"input file"		:	"../../examples/milano.csv",
+	"fit output"		:	"../../examples/results_mila/fitres.csv",
+	"opt appo output"	:	"../../examples/results_mila/appres.csv",
+	"mass appo output"	:	"../../examples/results_mila/mappres.csv",
+	"working directory"	:	"../../examples/results_mila/",
 	
 	"SECTION 2"             :       "ANALYSIS SETTINGS",
 	"alpha bc swipe"	:	true,
@@ -12,8 +12,7 @@
 	"pre plots"		: 	true,
 	"appo plots"		: 	true,
 	"alpha plot"		: 	true,
-	"swipe plot"		: 	true,
-	"mass appo"		: 	false,
+	"mass appo"		: 	true,
 	"data type"		:	"Babs",
 	"additional"		:	["Levoglucosan"],
 	"wavelength error"	:	5.0,
@@ -56,8 +55,8 @@
 	"HIGH_B_PRIME"		:	1e13,
 
 	"SECTION 4"             :       "MASS APPORTIONMENT",
-	"AAE_MIN"		:	0.9,
-	"AAE_MAX"		:	1.3
+	"AAE low"		:	0.9,
+	"AAE high"		:	1.5
 }
 
 	

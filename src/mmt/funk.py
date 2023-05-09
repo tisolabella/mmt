@@ -70,6 +70,3 @@ def stddev(l):
     avg_sq, sq_avg = average(ll), average(l) ** 2
     return np.sqrt(avg_sq - sq_avg)
 
-
-
-
