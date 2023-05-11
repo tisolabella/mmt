@@ -8,6 +8,7 @@ from csv import writer
 import matplotlib.pyplot as plt
 from scipy.stats import linregress
 from scipy.optimize import curve_fit
+from pathlib import Path
 
 from datahandle import data_read
 from funk import singlefit, doublefit
@@ -241,7 +242,7 @@ if levo_booked:
 
         #--- Save plots for the correlation vs parameter values
         try:
-            if cfg['pre plots']:
+            if cfg['plots']:
                 print('\t\tsaving plots')
                 fig, ax = plt.subplots()
                 ax.plot(best_alpha_BC, BC_correlation_pairs[best_alpha_BC], 'rx', label='best')
@@ -257,11 +258,12 @@ if levo_booked:
                 ax.set_ylabel(r'Levoglucosan analysis $R^2$')
                 fig.legend(bbox_to_anchor=(0.15, 0.15, 0.15, 0.25))
                 plt.tight_layout()
+                direc = cfg['working directory'] + f'plots/preplots/'
                 try:
-                    plt.savefig(cfg['working directory'] + f'plots/preplots/iter{iteration_number + 1}.png', dpi = 300)
+                    plt.savefig(direc + f'/iter{iteration_number + 1}.png', dpi = 300)
                 except FileNotFoundError as fnfe:
-                    # TODO if the folder does not exist, create it
-                    print(MISSING_FOLDER, fnfe)
+                    Path(direc).mkdir(parents=True, exist_ok=True)
+                    plt.savefig(direc + f'/iter{iteration_number + 1}.png', dpi = 300)
                 plt.close()
         except KeyError as ke:
             print(MISSING_KEYWORD, ke)
@@ -451,8 +453,8 @@ for sample in data:
 ###################################################################
 
 try:
-    print(f"---> Writing fit results to {cfg['fit output']}\n")
-    out_path = cfg['fit output']
+    out_path = cfg['working directory'] + 'fitres.csv'
+    print(f"---> Writing fit results to {out_path}\n")
     with open(out_path, 'w') as f:
         writa = writer(f)
         header = ['Name', 'Scale', 'eScale', 'AAE', 
@@ -471,6 +473,8 @@ try:
             writa.writerow(linetowrite) 
 except KeyError as ke:
     print(MISSING_KEYWORD, ke)
+except FileNotFoundError as fnfe:
+    Path(cfg['working directory']).mkdir(parents=True, exist_ok=True)
 
 
 
@@ -496,9 +500,9 @@ for i in range(len(data[0].properties.wavelength)):
     header_2 += ['BC_FF', 'BC_WB', 'BrC']
 
 try:
+    out_path = cfg['working directory'] + 'appres.csv'
     print(f"---> Writing optical apportionment"
-            f" results to {cfg['fit output']}\n")
-    out_path = cfg['opt appo output']
+            f" results to {out_path}\n")
     with open(out_path, 'w') as f:
         writa = writer(f)
         writa.writerow(header_1)
@@ -519,6 +523,8 @@ try:
             writa.writerow(line_to_write)
 except KeyError as ke:
     print(MISSING_KEYWORD, ke)
+except FileNotFoundError as fnfe:
+    Path(cfg['working directory']).mkdir(parents=True, exist_ok=True)
 
 
 
@@ -530,7 +536,7 @@ except KeyError as ke:
 
 #---- Save fit plots plots for the two fits if booked
 try:
-    if cfg['fit plots']:
+    if cfg['plots']:
         print(f'---> Saving fit plots in {cfg["working directory"]}' + f'plots/fitplots/' + '\n') 
         for sample in data:
             prp = sample.properties
@@ -565,14 +571,19 @@ try:
             plt.grid(alpha=0.3)
             plt.legend()
             plt.tight_layout()
-            plt.savefig(cfg['working directory'] + f'plots/fitplots/{sample.name}.png', dpi = 300)
+            direc = cfg['working directory'] + f'plots/fitplots/'
+            try:
+                plt.savefig(direc+f'{sample.name}.png', dpi = 300)
+            except FileNotFoundError as fnfe:
+                Path(direc).mkdir(parents=True, exist_ok=True)
+                plt.savefig(direc+f'{sample.name}.png', dpi = 300)
             plt.close()
 except KeyError as ke:
     print(MISSING_KEYWORD, ke)
 
 #----- Save plots for the variation of alpha_brc if booked
 try:
-    if cfg['alpha plot']:
+    if cfg['plots']:
         print(f'---> Saving alpha plot in {cfg["working directory"]}' + f'plots/fitplots/' + '\n') 
         # Lists to store values for plotting
         alpha, error, names = [], [], []
@@ -587,11 +598,12 @@ try:
         ax.grid(alpha=0.3)
         ax.set_ylabel(r'$\alpha_{BrC}$')
         plt.tight_layout()
+        direc = cfg['working directory'] + f'plots/fitplots/'
         try:
-            fig.savefig(cfg['working directory'] + f'plots/fitplots/alpha_BrC.png', dpi = 300)
+            plt.savefig(direc+f'alpha_BrC.png', dpi = 300)
         except FileNotFoundError as fnfe:
-            # TODO if the folder does not exist, create it
-            print(MISSING_FOLDER, fnfe)
+            Path(direc).mkdir(parents=True, exist_ok=True)
+            plt.savefig(direc+f'alpha_BrC.png', dpi = 300)
 except KeyError as ke:
     print(MISSING_KEYWORD, ke)
 
@@ -612,18 +624,19 @@ try:
         ax.set_xlabel(r'$\alpha_{BC}$')
         ax.legend()
         plt.tight_layout()
+        direc = cfg['working directory'] + f'plots/fitplots/'
         try:
-            fig.savefig(cfg['working directory'] + f'plots/fitplots/swipe.png', dpi=300)
+            plt.savefig(direc+f'swipe.png', dpi = 300)
         except FileNotFoundError as fnfe:
-            # TODO if the folder does not exist, create it
-            print(MISSING_FOLDER, fnfe)
+            Path(direc).mkdir(parents=True, exist_ok=True)
+            plt.savefig(direc+f'swipe.png', dpi = 300)
 except KeyError as ke:
     print(MISSING_KEYWORD, ke)
 
 
 #----- Save plots for the optical apportionment if booked
 try:
-    if cfg['appo plots']:
+    if cfg['plots']:
         print(f'---> Saving optical apportionment plots in {cfg["working directory"]}' + f'plots/appoplots/' + '\n') 
         # Lists to store values for plotting
         bc_ff_short, bc_wb_short, brc_short, names = [], [], [], []
@@ -667,12 +680,14 @@ try:
         ax2.legend()
         fig1.tight_layout()
         fig2.tight_layout()
+        direc = cfg['working directory'] + f'plots/appoplots/'
         try:
-            fig1.savefig(cfg['working directory'] + f'plots/appoplots/short_lambda.png', dpi=300)
-            fig2.savefig(cfg['working directory'] + f'plots/appoplots/long_lambda.png', dpi=300)
+            fig1.savefig(direc+f'short_lambda.png', dpi = 300)
+            fig2.savefig(direc+f'long_lambda.png', dpi = 300)
         except FileNotFoundError as fnfe:
-            # TODO if the folder does not exist, create it
-            print(MISSING_FOLDER, fnfe)
+            Path(direc).mkdir(parents=True, exist_ok=True)
+            fig1.savefig(direc+f'short_lambda.png', dpi = 300)
+            fig2.savefig(direc+f'long_lambda.png', dpi = 300)
 except KeyError as ke:
     print(MISSING_KEYWORD, ke)
 
@@ -692,7 +707,7 @@ input_file_line = 'Input file:\t' + cfg['input file'] + '\n'
 output_folder_line = 'Output folder:\t' + cfg['working directory'] + '\n'
 presets_line = 'Booked presets:\t' + str(cfg['presets']) + '\n'
 best_par_line = f'Best parameters: \n\talpha_BC = {best_alpha_BC} \n\talpha_FF = {best_alpha_FF} \n\talpha_WB = {best_alpha_WB}\n'
-saved_par_plots_line = f"Parameter optimization plots in:\t{cfg['working directory']}plots/preplots/\n" if cfg['pre plots'] else f"Parameter optimization plots not saved\n"
+saved_par_plots_line = f"Parameter optimization plots in:\t{cfg['working directory']}plots/preplots/\n" if cfg['plots'] else f"Parameter optimization plots not saved\n"
 failed_fit_count_line = f'N° failed fits:\t{failed_fit_count}\n'
 failed_fit_line = f'Failed fits:\t{failed_fit}\n'
 # Get a list to do statistics on alpha brown
@@ -701,8 +716,8 @@ list_for_uabrc = [d.properties.u_alpha_brc for d in data]
 avg_alpha, stddev_alpha = average( list_for_abrc), stddev(list_for_abrc)
 alpha_mean_line = f"Weighted average alpha_BrC:\t {round(avg_alpha, 7)}\n"
 alpha_stddev_line = f"Uncertainty on alpha_BrC:\t {round(stddev_alpha, 7)}\n"
-saved_fit_plots_line = f"Fit plots in:\t{cfg['working directory']}plots/fitplots/\n" if cfg['fit plots'] else f"Fit plots not saved\n"
-saved_appo_plots_line = f"Optical apportionment plots in:\t{cfg['working directory']}plots/appoplots/\n" if cfg['appo plots'] else f"Optical apportionment plots not saved\n"
+saved_fit_plots_line = f"Fit plots in:\t{cfg['working directory']}plots/fitplots/\n" if cfg['plots'] else f"Fit plots not saved\n"
+saved_appo_plots_line = f"Optical apportionment plots in:\t{cfg['working directory']}plots/appoplots/\n" if cfg['plots'] else f"Optical apportionment plots not saved\n"
 try:
     with open(cfg['working directory'] + 'log.txt', 'w') as f:
         print(f'---> Writing log file in {cfg["working directory"]}' + '\n') 
@@ -725,6 +740,8 @@ try:
         f.write(saved_appo_plots_line)
 except KeyError as ke:
     print(MISSING_KEYWORD, ke)
+except FileNotFoundError as fnfe:
+    Path(cfg['working directory']).mkdir(parents=True, exist_ok=True)
 
 
 
@@ -732,8 +749,11 @@ except KeyError as ke:
 # SAVE JSON
 ##################################################################
 print(f"---> Saving .pkl data file for internal use in {cfg['working directory']}\n")
-with open(cfg['working directory'] + 'data.pkl', 'wb') as f:
-    pickle.dump(data, f, -1)
+try:
+    with open(cfg['working directory'] + 'data.pkl', 'wb') as f:
+        pickle.dump(data, f, -1)
+except FileNotFoundError as fnfe:
+    Path(cfg['working directory']).mkdir(parents=True, exist_ok=True)
 
 
 print('*** DONE ***\n\n')

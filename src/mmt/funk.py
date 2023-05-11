@@ -26,6 +26,9 @@ def doublefit(x, scale_1, alpha_1, scale_2, alpha_2):
     return scale_1 * x ** ( - alpha_1) + scale_2 * x ** ( - alpha_2 )
 
 
+def line(x, a, b):
+    return a * x + b
+
 
 def set_resolution(*best_parameters, iteration=2):
     """Function to increase the parameter scan resolution"""
