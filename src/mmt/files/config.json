@@ -50,7 +50,9 @@
 
 	"SECTION 4"             :       "MASS APPORTIONMENT",
 	"AAE low"		:	0.9,
-	"AAE high"		:	1.5
+	"AAE high"		:	1.5,
+	"k1"			: 	0.36,
+	"k2"			:	0.45
 }
 
 	
