@@ -421,9 +421,9 @@ for sample in data:
 
 
 
-#####################################################################
+####################################################################
 # OPTICAL APPORTIONMENT
-#####################################################################
+####################################################################
 
 print("---> Performing optical apportionment...\n")
 for sample in data:
@@ -453,6 +453,79 @@ for sample in data:
              
 
 
+
+###################################################################
+# MASS APPORTIONMENT
+###################################################################
+
+# Check whether k1 and k2 are provided 
+if cfg['k1'] == 0 or cfg['k2'] == 0:
+    do_fit = True
+else:
+    k1 = cfg['k1']
+    k2 = cfg['k2']
+    do_fit = False
+
+print("---> Performing mass apportionment...\n")
+#--- EC apportionment
+for sample in data:
+    prp = sample.properties
+    # Get the longest and shortest wavelengths
+    # in case the list is not in order
+    lambda_long = max(prp.wavelength)
+    i_l = prp.wavelength.index(lambda_long)
+    # Apportion EC
+    prp.ec_ff = prp.ec * (prp.bc_ff[i_l] / (prp.abs[i_l] - prp.brc[i_l]))
+    prp.ec_wb = prp.ec * (prp.bc_wb[i_l] / (prp.abs[i_l] - prp.brc[i_l]))
+#--- OC apportionment
+# Create and populate the lists for the fits
+k1_list, k2_list = [], []
+k1_x, k1_y = [], []
+k2_x, k2_y = [], []
+for sample in data:
+    prp = sample.properties
+    # Get the longest and shortest wavelengths
+    # in case the list is not in order
+    lambda_long = max(prp.wavelength)
+    i_l = prp.wavelength.index(lambda_long)
+    if prp.aae < cfg['AAE high'] and prp.aae > cfg['AAE low']:
+        k1_list.append(sample)
+        k1_x.append(prp.bc_ff[i_l])
+        k1_y.append(prp.oc)
+    else:
+        k2_list.append(sample)
+# Perform fit if needed
+if do_fit:
+    fit_1 = linregress(k1_x, y=k1_y)
+    k1 = fit_1.slope
+    u_k1 = fit_1.stderr
+    int1 = fit_1.intercept
+# Calculate OC_FF for all samples using the k1 just found
+for sample in data:
+    prp = sample.properties
+    lambda_long = max(prp.wavelength)
+    i_l = prp.wavelength.index(lambda_long)
+    prp.oc_ff = k1 * prp.bc_ff[i_l]
+# Create the x and y lists for the second regression
+for sample in k2_list:
+    prp = sample.properties
+    lambda_short = min(prp.wavelength)
+    i_s = prp.wavelength.index(lambda_short)
+    k2_x.append(prp.brc[i_s])
+    k2_y.append(prp.oc - prp.oc_ff)
+# Perform fit if needed
+if do_fit:
+    fit_2 = linregress(k2_x, y=k2_y)
+    k2 = fit_2.slope
+    u_k2 = fit_2.stderr
+    int2 = fit_2.intercept
+# Calculate OC_WB and OC_NC for all samples using the k1 just found
+for sample in data:
+    prp = sample.properties
+    lambda_short = min(prp.wavelength)
+    i_s = prp.wavelength.index(lambda_short)
+    prp.oc_wb = k2 * prp.brc[i_s]
+    prp.oc_nc = prp.oc - prp.oc_ff - prp.oc_wb
 
 
 
@@ -536,6 +609,35 @@ except FileNotFoundError as fnfe:
     Path(cfg['working directory']).mkdir(parents=True, exist_ok=True)
 
 
+
+
+###################################################################
+# MASS APPORTIONMENT RESULTS WRITEOUT
+###################################################################
+
+# Use the first sample to write header
+header = ['Name', 'EC_FF', 'EC_WB', 'OC_FF', 'OC_WB', 'OC_NC']
+
+try:
+    out_path = cfg['working directory'] + 'mappres.csv'
+    print(f"---> Writing mass apportionment"
+            f" results to {out_path}\n")
+    with open(out_path, 'w') as f:
+        writa = writer(f)
+        writa.writerow(header)
+        for sample in data:
+            prp = sample.properties
+            line_to_write = [sample.name,]
+            line_to_write.append(prp.ec_ff)
+            line_to_write.append(prp.ec_wb)
+            line_to_write.append(prp.oc_ff)
+            line_to_write.append(prp.oc_wb)
+            line_to_write.append(prp.oc_nc)
+            writa.writerow(line_to_write)
+except KeyError as ke:
+    print(MISSING_KEYWORD, ke)
+except FileNotFoundError as fnfe:
+    Path(cfg['working directory']).mkdir(parents=True, exist_ok=True)
 
 
 
@@ -701,6 +803,33 @@ except KeyError as ke:
     print(MISSING_KEYWORD, ke)
 
 
+#--- Save k1 and k2 regression plots if the fit is booked
+print('---> Saving mass apportionment plots...\n')
+if cfg['plots'] and do_fit:
+    x1 = np.linspace(min(k1_x), max(k1_x), 100)
+    line1 = line(x1, k1, int1)
+    plt.plot(k1_x, k1_y, '.r')
+    plt.plot(x1, line1, '--k',)
+    plt.ylabel(r'OC concentration   [$\mu$g/m$^3$]') 
+    plt.xlabel(r'$b_{abs}^{BC,FF}$'+f'@{lambda_long} nm    [Mm$^{-1}$]')
+    plt.grid(alpha=0.3)
+    direc = cfg['working directory'] + f'plots/mappplots/'
+    try:
+        plt.savefig(direc+'k1_fit.jpg', dpi = 300)
+    except FileNotFoundError as fnfe:
+        Path(direc).mkdir(parents=True, exist_ok=True)
+        plt.savefig(direc+'k1_fit.jpg', dpi = 300)
+    plt.close()
+    x2 = np.linspace(min(k2_x), max(k2_x), 200)
+    line2 = line(x2, k2, int2)
+    plt.plot(k2_x, k2_y, '.r')
+    plt.plot(x2, line2, '--k')
+    plt.ylabel(r'OC - OC$_{FF}$ concentration   [$\mu$g/m$^3$]') 
+    plt.xlabel(r'$b_{abs}^{BrC}$'+f'@{lambda_short} nm   [Mm$^{-1}$]')
+    plt.grid(alpha=0.3)
+    direc = cfg['working directory'] + f'plots/mappplots/'
+    plt.savefig(direc+'k2_fit.png', dpi = 300)
+    plt.close()
 
 #####################################################################
 # WRITE LOG FILE
@@ -727,6 +856,9 @@ alpha_mean_line = f"Weighted average alpha_BrC:\t {round(avg_alpha, 7)}\n"
 alpha_stddev_line = f"Uncertainty on alpha_BrC:\t {round(stddev_alpha, 7)}\n"
 saved_fit_plots_line = f"Fit plots in:\t{cfg['working directory']}plots/fitplots/\n" if cfg['plots'] else f"Fit plots not saved\n"
 saved_appo_plots_line = f"Optical apportionment plots in:\t{cfg['working directory']}plots/appoplots/\n" if cfg['plots'] else f"Optical apportionment plots not saved\n"
+k1_line = f"k1:\t {round(k1, 3)}\t\tR^2:\t{round(fit_1.rvalue ** 2 ,3)}\n" if do_fit else f"k1:\t {round(k1, 3)}\n"
+k2_line = f"k2:\t {round(k2, 3)}\t\tR^2:\t{round(fit_2.rvalue ** 2 ,3)}\n" if do_fit else f"k2:\t {round(k2, 3)}\n"
+saved_reg_plots_line = f"Linear regression plots in:\t{cfg['working directory']}plots/mappoplots/\n" if cfg['plots'] and do_fit else f"Linear regression plots not saved\n"
 try:
     with open(cfg['working directory'] + 'log.txt', 'w') as f:
         print(f'---> Writing log file in {cfg["working directory"]}' + '\n') 
@@ -747,6 +879,10 @@ try:
         f.write(saved_fit_plots_line)
         f.write('\n---------- OPTICAL APPORTIONMENT\n')
         f.write(saved_appo_plots_line)
+        f.write('\n---------- MASS APPORTIONMENT\n')
+        f.write(k1_line)
+        f.write(k2_line)
+        f.write(saved_reg_plots_line)
 except KeyError as ke:
     print(MISSING_KEYWORD, ke)
 except FileNotFoundError as fnfe:
