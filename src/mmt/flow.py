@@ -22,9 +22,15 @@ warnings.filterwarnings("ignore")
 
 
 
+
+
+
 #####################################################################
 # CONSTANTS
 #####################################################################
+
+
+
 
 
 
@@ -33,7 +39,8 @@ warnings.filterwarnings("ignore")
 # PRINTOUT STRINGS
 #####################################################################
 MISSING_KEYWORD = "ERROR: keyword not present in the configuration file"
-MISSING_FOLDER = "ERROR: the folder is not present, some files cannot be saved"
+
+
 
 
 
@@ -55,6 +62,8 @@ except Exception as e:
 
 # Read the data with the method from datahandle.py
 data = data_read(configuration_file_path)
+
+
 
 
 
@@ -482,9 +491,9 @@ except FileNotFoundError as fnfe:
 
 
 
-#####################################################################
+###################################################################
 # OPTICAL APPORTIONMENT RESULTS WRITEOUT
-#####################################################################
+###################################################################
 
 # Use the first sample to write header
 header_1 = ['',]
