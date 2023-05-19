@@ -26,17 +26,7 @@ warnings.filterwarnings("ignore")
 
 
 #####################################################################
-# CONSTANTS
-#####################################################################
-
-
-
-
-
-
-
-#####################################################################
-# PRINTOUT STRINGS
+# CONSTANTS & PRINTOUT STRINGS
 #####################################################################
 MISSING_KEYWORD = "ERROR: keyword not present in the configuration file"
 
@@ -830,6 +820,10 @@ if cfg['plots'] and do_fit:
     direc = cfg['working directory'] + f'plots/mappplots/'
     plt.savefig(direc+'k2_fit.png', dpi = 300)
     plt.close()
+
+
+
+
 
 #####################################################################
 # WRITE LOG FILE
