@@ -817,11 +817,49 @@ if cfg['plots'] and do_fit:
     plt.ylabel(r'OC - OC$_{FF}$ concentration   [$\mu$g/m$^3$]') 
     plt.xlabel(r'$b_{abs}^{BrC}$'+f'@{lambda_short} nm   [Mm$^{-1}$]')
     plt.grid(alpha=0.3)
-    direc = cfg['working directory'] + f'plots/mappplots/'
+    direc = cfg['working directory'] + f'plots/mappoplots/'
     plt.savefig(direc+'k2_fit.png', dpi = 300)
     plt.close()
 
 
+#----- Save time series plots for the mass apportionment if booked
+try:
+    if cfg['plots']:
+        print(f'---> Saving time series mass apportionment plots in {cfg["working directory"]}' + f'plots/mappoplots/' + '\n') 
+        # Lists to store values for plotting
+        oc_ff, oc_wb, oc_nc, ec_ff, ec_wb, names = [], [], [], [], [], []
+        for sample in data:
+            prp = sample.properties
+            names.append(sample.name)
+            oc_ff.append(prp.oc_ff)
+            oc_wb.append(prp.oc_wb)
+            oc_nc.append(prp.oc_nc)
+            ec_ff.append(prp.ec_ff)
+            ec_wb.append(prp.ec_wb)
+        fig1, ax1 = plt.subplots() 
+        ax1.plot(names, oc_ff, '-g', label=r'OC$_{FF}$')
+        ax1.plot(names, oc_ff, '.g')
+        ax1.plot(names, oc_wb, '-b', label=r'OC$_{WB}$')
+        ax1.plot(names, oc_wb, '.b')
+        ax1.plot(names, oc_nc, '-r', label=r'OC$_{NC}$')
+        ax1.plot(names, oc_nc, '.r')
+        ax1.plot(names, ec_ff, '-k', label=r'EC$_{FF}$')
+        ax1.plot(names, ec_ff, '.k')
+        ax1.plot(names, ec_wb, '-m', label=r'EC$_{WB}$')
+        ax1.plot(names, ec_wb, '.m')
+        ax1.set_xticklabels(names, rotation=75)
+        ax1.grid(alpha=0.3)
+        ax1.set_ylabel(r'Concentration ' + r'[$\mu$g cm$^{-3}$]')
+        ax1.legend()
+        fig1.tight_layout()
+        direc = cfg['working directory'] + f'plots/mappoplots/'
+        try:
+            fig1.savefig(direc+f'time_series.png', dpi = 300)
+        except FileNotFoundError as fnfe:
+            Path(direc).mkdir(parents=True, exist_ok=True)
+            fig1.savefig(direc+f'time_series.png', dpi = 300)
+except KeyError as ke:
+    print(MISSING_KEYWORD, ke)
 
 
 
@@ -839,7 +877,7 @@ input_file_line = 'Input file:\t' + cfg['input file'] + '\n'
 output_folder_line = 'Output folder:\t' + cfg['working directory'] + '\n'
 presets_line = 'Booked presets:\t' + str(cfg['presets']) + '\n'
 best_par_line = f'Best parameters: \n\talpha_BC = {best_alpha_BC} \n\talpha_FF = {best_alpha_FF} \n\talpha_WB = {best_alpha_WB}\n'
-saved_par_plots_line = f"Parameter optimization plots in:\t{cfg['working directory']}plots/preplots/\n" if cfg['plots'] else f"Parameter optimization plots not saved\n"
+saved_par_plots_line = f"Parameter optimization plots in:\t{cfg['working directory']}plots/preplots/\n" if cfg['plots'] and len(cfg['presets']) > 0 else f"Parameter optimization plots not saved\n"
 failed_fit_count_line = f'N° failed fits:\t{failed_fit_count}\n'
 failed_fit_line = f'Failed fits:\t{failed_fit}\n'
 # Get a list to do statistics on alpha brown
