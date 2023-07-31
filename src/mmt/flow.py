@@ -148,7 +148,7 @@ if levo_booked:
             # Fix the alpha BC value in a new function 
             def typefit(x, A, B, alpha_BrC):
                 return doublefit(x, A, best_alpha_BC, B, alpha_BrC)
-            # Fix the alpha FF value in a new function 
+            # Fix the alpha FF and alpha WB values in a new function 
             def sourcefit(x, A_p, B_p):
                 return doublefit(x, A_p, alpha_FF, B_p, alpha_WB)
             # Iterate over all the samples
@@ -204,7 +204,7 @@ if levo_booked:
             # Fix the alpha BC value in a new function 
             def typefit(x, A, B, alpha_BrC):
                 return doublefit(x, A, best_alpha_BC, B, alpha_BrC)
-            # Fix the alpha FF value in a new function 
+            # Fix the alpha FF and alpha WB values in a new function 
             def sourcefit(x, A_p, B_p):
                 return doublefit(x, A_p, best_alpha_FF, B_p, alpha_WB)
             # Iterate over all the samples
@@ -293,7 +293,7 @@ if levo_booked:
 
 
 #################################################################
-# ALPHA BrC variation with ALPHA BC
+# ALPHA BrC variation with ALPHA BC (swipe)
 #################################################################
 
 try:
@@ -822,7 +822,7 @@ if cfg['plots'] and do_fit:
     plt.ylabel(r'OC concentration   [$\mu$g/m$^3$]') 
     plt.xlabel(r'$b_{abs}^{BC,FF}$'+f'@{lambda_long} nm    [Mm$^{-1}$]')
     plt.grid(alpha=0.3)
-    direc = cfg['working directory'] + f'plots/mappplots/'
+    direc = cfg['working directory'] + f'plots/mappoplots/'
     try:
         plt.savefig(direc+'k1_fit.jpg', dpi = 300)
     except FileNotFoundError as fnfe:

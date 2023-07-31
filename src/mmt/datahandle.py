@@ -57,7 +57,7 @@ class Property():
         ec (float, ug/cm3)
         oc (float, ug/cm3)
 
-        # From the fits
+        # From the fit
         aae (float)
         u_aae (float)
         scale (float)
