@@ -121,6 +121,8 @@ if levo_booked:
                 regression_res = linregress(levo_set, y=BrC_set)
                 R_2_alpha_BC.append(regression_res.rvalue ** 2)
                 BC_correlation_pairs[alpha_BC] = regression_res.rvalue ** 2
+                # For the article
+                #print(f'alpha_BC {alpha_BC}: slope {regression_res.slope} inter {regression_res.intercept} R2 {regression_res.rvalue ** 2}')
             except Exception as e:
                 print(f'REGRESSION ERROR for ALPHA BC: {e}')
                 R_2_alpha_BC.append(0)
@@ -132,6 +134,9 @@ if levo_booked:
             pass # Do not change the value
         else:
             best_alpha_BC = alpha_BC_set[max_R2_index]
+        #For the article
+        #if iteration_number == cfg['iterations'] - 1: # Final lap
+            #print(f'alpha_BC {alpha_BC_set}\nR2 {R_2_alpha_BC}')
 
         #------ Do the alpha_FF iteration -------------
         # List for the correlations
@@ -185,6 +190,9 @@ if levo_booked:
             pass # Do not change the value
         else:
             best_alpha_FF = alpha_FF_set[max_R2_index]
+        #For the article
+        #if iteration_number == cfg['iterations'] - 1: # Final lap
+            #print(f'alpha_FF {alpha_FF_set}\nR2 {R_2_alpha_FF}')
 
         #------ Do the alpha_WB iteration -------------
         # List for the correlations
@@ -227,6 +235,8 @@ if levo_booked:
                 regression_res = linregress(levo_set, y=BC_WB_set)
                 R_2_alpha_WB.append(regression_res.rvalue ** 2)
                 WB_correlation_pairs[alpha_WB] = regression_res.rvalue ** 2
+                # For the article
+                #print(f'alpha_WB {alpha_WB}: slope {regression_res.slope} inter {regression_res.intercept} R2 {regression_res.rvalue ** 2}')
             except Exception as e:
                 print(f'REGRESSION ERROR for ALPHA WB: {e}')
                 R_2_alpha_WB.append(0)
@@ -238,6 +248,9 @@ if levo_booked:
             pass # Do not change the value
         else:
             best_alpha_WB = alpha_WB_set[max_R2_index]
+        #For the article
+        #if iteration_number == cfg['iterations'] - 1: # Final lap
+            #print(f'alpha_WB {alpha_WB_set}\nR2 {R_2_alpha_WB}')
 
         #--- Save plots for the correlation vs parameter values
         try:
@@ -306,6 +319,9 @@ try:
             sw_alpha_BrC_stddev_set.append(stddev(tmp_abrc_list))
 except KeyError as ke:
     print(MISSING_KEYWORD, ke)
+
+# For the article
+#print(f'avg {sw_alpha_BrC_set} \nstdev {sw_alpha_BrC_stddev_set}')
 
 
 
@@ -515,6 +531,7 @@ for sample in data:
     lambda_short = min(prp.wavelength)
     i_s = prp.wavelength.index(lambda_short)
     prp.oc_wb = k2 * prp.brc[i_s]
+    #input(f'name {sample.name} lambda_short {lambda_short} brc {prp.brc[i_s]} k2 {k2} oc_wb {prp.oc_wb}')
     prp.oc_nc = prp.oc - prp.oc_ff - prp.oc_wb
 
 
@@ -796,6 +813,8 @@ except KeyError as ke:
 #--- Save k1 and k2 regression plots if the fit is booked
 print('---> Saving mass apportionment plots...\n')
 if cfg['plots'] and do_fit:
+    def line(x, m, q):
+        return m * x + q
     x1 = np.linspace(min(k1_x), max(k1_x), 100)
     line1 = line(x1, k1, int1)
     plt.plot(k1_x, k1_y, '.r')
@@ -884,8 +903,8 @@ failed_fit_line = f'Failed fits:\t{failed_fit}\n'
 list_for_abrc = [d.properties.alpha_brc for d in data]
 list_for_uabrc = [d.properties.u_alpha_brc for d in data]
 avg_alpha, stddev_alpha = average( list_for_abrc), stddev(list_for_abrc)
-alpha_mean_line = f"Weighted average alpha_BrC:\t {round(avg_alpha, 7)}\n"
-alpha_stddev_line = f"Uncertainty on alpha_BrC:\t {round(stddev_alpha, 7)}\n"
+alpha_mean_line = f"Average alpha_BrC:\t {round(avg_alpha, 7)}\n"
+alpha_stddev_line = f"Uncertainty (stdev) on alpha_BrC:\t {round(stddev_alpha, 7)}\n"
 saved_fit_plots_line = f"Fit plots in:\t{cfg['working directory']}plots/fitplots/\n" if cfg['plots'] else f"Fit plots not saved\n"
 saved_appo_plots_line = f"Optical apportionment plots in:\t{cfg['working directory']}plots/appoplots/\n" if cfg['plots'] else f"Optical apportionment plots not saved\n"
 k1_line = f"k1:\t {round(k1, 3)}\t\tR^2:\t{round(fit_1.rvalue ** 2 ,3)}\n" if do_fit else f"k1:\t {round(k1, 3)}\n"
@@ -923,7 +942,7 @@ except FileNotFoundError as fnfe:
 
 
 ##################################################################
-# SAVE JSON
+# SAVE PICKLE
 ##################################################################
 print(f"---> Saving .pkl data file for internal use in {cfg['working directory']}\n")
 try:
